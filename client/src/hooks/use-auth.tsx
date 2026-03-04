@@ -23,11 +23,12 @@ export function useAuth() {
         },
         onSuccess: (data) => {
             if (data.success) {
-                localStorage.setItem("user", JSON.stringify(data.data));
-                setUser(data.data);
+                const userData = data.data || data.user; // Handle both result formats
+                localStorage.setItem("user", JSON.stringify(userData));
+                setUser(userData);
                 toast({
                     title: "반갑습니다!",
-                    description: `${data.data.nickname}님, 환영합니다.`,
+                    description: `${userData.nickname}님, 환영합니다.`,
                 });
             }
         },
@@ -58,26 +59,58 @@ export function useAuth() {
             }
         }
 
-        window.Kakao.Auth.login({
-            success: function () {
-                window.Kakao.API.request({
-                    url: '/v2/user/me',
-                    success: function (res: any) {
-                        loginMutation.mutate({
-                            id: res.id.toString(),
-                            nickname: res.kakao_account.profile.nickname,
-                            avatarUrl: res.kakao_account.profile.thumbnail_image_url
-                        });
-                    },
-                    fail: function (error: any) {
-                        console.error(error);
-                    },
-                });
-            },
-            fail: function (err: any) {
-                console.error(err);
-            },
-        });
+        const kakaoLoginAction = () => {
+            if (!window.Kakao) return;
+
+            // Ensure initialization
+            if (!window.Kakao.isInitialized()) {
+                window.Kakao.init('9c016096164155750e7d5adc6e17d4da');
+            }
+
+            window.Kakao.Auth.login({
+                success: function () {
+                    window.Kakao.API.request({
+                        url: '/v2/user/me',
+                        success: function (res: any) {
+                            console.log("Kakao User Info:", res);
+                            loginMutation.mutate({
+                                id: res.id.toString(),
+                                nickname: res.properties?.nickname || res.kakao_account?.profile?.nickname,
+                                avatarUrl: res.properties?.thumbnail_image || res.kakao_account?.profile?.thumbnail_image_url
+                            });
+                        },
+                        fail: function (error: any) {
+                            console.error("Kakao API request failed:", error);
+                            toast({
+                                title: "오류",
+                                description: "로그인 정보를 가져오는데 실패했습니다.",
+                                variant: "destructive"
+                            });
+                        },
+                    });
+                },
+                fail: function (err: any) {
+                    console.error("Kakao Login failed:", err);
+                },
+            });
+        };
+
+        if (window.Kakao && window.Kakao.Auth) {
+            kakaoLoginAction();
+        } else {
+            console.warn("Kakao SDK not ready, retrying...");
+            let retryCount = 0;
+            const interval = setInterval(() => {
+                retryCount++;
+                if (window.Kakao && window.Kakao.Auth) {
+                    clearInterval(interval);
+                    kakaoLoginAction();
+                } else if (retryCount > 10) {
+                    clearInterval(interval);
+                    console.error("Kakao SDK failed to load after 10 retries.");
+                }
+            }, 500);
+        }
     }, [loginMutation, toast]);
 
     const logout = useCallback(() => {

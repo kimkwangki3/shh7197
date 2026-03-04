@@ -57,26 +57,50 @@ export default function KakaoLogin() {
             }
         }
 
-        window.Kakao.Auth.login({
-            success: function () {
-                window.Kakao.API.request({
-                    url: '/v2/user/me',
-                    success: function (res: any) {
-                        loginMutation.mutate({
-                            id: res.id,
-                            nickname: res.kakao_account.profile.nickname,
-                            avatarUrl: res.kakao_account.profile.profile_image_url,
-                        });
-                    },
-                    fail: function (error: any) {
-                        console.error(error);
-                    },
-                });
-            },
-            fail: function (error: any) {
-                console.error(error);
-            },
-        });
+        const kakaoLoginAction = () => {
+            if (!window.Kakao) return;
+
+            if (!window.Kakao.isInitialized()) {
+                window.Kakao.init('9c016096164155750e7d5adc6e17d4da');
+            }
+
+            window.Kakao.Auth.login({
+                success: function () {
+                    window.Kakao.API.request({
+                        url: '/v2/user/me',
+                        success: function (res: any) {
+                            loginMutation.mutate({
+                                id: res.id.toString(),
+                                nickname: res.properties?.nickname || res.kakao_account?.profile?.nickname,
+                                avatarUrl: res.properties?.thumbnail_image || res.kakao_account?.profile?.thumbnail_image_url,
+                            });
+                        },
+                        fail: function (error: any) {
+                            console.error("Kakao API request failed:", error);
+                        },
+                    });
+                },
+                fail: function (error: any) {
+                    console.error("Kakao Login failed:", error);
+                },
+            });
+        };
+
+        if (window.Kakao && window.Kakao.Auth) {
+            kakaoLoginAction();
+        } else {
+            console.warn("Kakao SDK not ready, retrying...");
+            let retryCount = 0;
+            const interval = setInterval(() => {
+                retryCount++;
+                if (window.Kakao && window.Kakao.Auth) {
+                    clearInterval(interval);
+                    kakaoLoginAction();
+                } else if (retryCount > 10) {
+                    clearInterval(interval);
+                }
+            }, 500);
+        }
     };
 
     return (

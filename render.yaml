@@ -2,7 +2,6 @@ services:
   - type: web
     name: shh7197-app
     runtime: node
-    plan: starter
     buildCommand: npm install && npm run build
     startCommand: npm run start
     envVars:
@@ -15,4 +14,3 @@ services:
 
 databases:
   - name: shh7197-db
-    plan: standard

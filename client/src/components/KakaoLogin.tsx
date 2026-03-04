@@ -42,10 +42,19 @@ export default function KakaoLogin() {
         if (!window.Kakao) {
             toast({
                 title: "오류",
-                description: "카카오 SDK를 로드할 수 없습니다.",
+                description: "카카오 SDK를 로드할 수 없습니다. 잠시 후 다시 시도해주세요.",
                 variant: "destructive",
             });
             return;
+        }
+
+        // Initialize if not already done
+        if (!window.Kakao.isInitialized()) {
+            try {
+                window.Kakao.init('9c016096164155750e7d5adc6e17d4da');
+            } catch (e) {
+                console.error("Kakao init error:", e);
+            }
         }
 
         window.Kakao.Auth.login({

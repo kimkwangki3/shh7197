@@ -15,4 +15,4 @@ services:
 
 databases:
   - name: shh7197-db
-    plan: pro
+    plan: standard

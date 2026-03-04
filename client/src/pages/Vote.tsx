@@ -22,8 +22,11 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { ko } from "date-fns/locale";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function Vote() {
+    const { checkAuthOrLogin } = useAuth();
     const { toast } = useToast();
     const [votedIds, setVotedIds] = useState<number[]>([]);
 
@@ -163,7 +166,7 @@ export default function Vote() {
                                         {/* Voting Buttons */}
                                         <div className="grid grid-cols-2 gap-3 mb-2">
                                             <Button
-                                                onClick={() => handleVote(item.id, "agree")}
+                                                onClick={() => checkAuthOrLogin(() => handleVote(item.id, 'agree'))}
                                                 disabled={isVoted || mutation.isPending}
                                                 className={cn(
                                                     "h-14 rounded-2xl font-black text-[15px] transition-all flex items-center justify-center gap-2",
@@ -173,7 +176,7 @@ export default function Vote() {
                                                 <ThumbsUp className="w-4.5 h-4.5" /> 찬성
                                             </Button>
                                             <Button
-                                                onClick={() => handleVote(item.id, "disagree")}
+                                                onClick={() => checkAuthOrLogin(() => handleVote(item.id, 'disagree'))}
                                                 disabled={isVoted || mutation.isPending}
                                                 className={cn(
                                                     "h-14 rounded-2xl font-black text-[15px] transition-all flex items-center justify-center gap-2 border-2",

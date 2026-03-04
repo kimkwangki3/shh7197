@@ -4,11 +4,16 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Link } from "wouter";
+import { useLocation } from "wouter";
 import { Users, Clock, PlayCircle, MessageSquare, Plus, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Home() {
+  const [, setLocation] = useLocation();
+  const { checkAuthOrLogin } = useAuth();
+  const { toast } = useToast();
   const { data: heroVote, isLoading: heroLoading } = useQuery<{ success: boolean; data: Vote }>({
     queryKey: ["/api/votes/hero"],
   });
@@ -26,9 +31,14 @@ export default function Home() {
           <h2 className="text-lg font-bold flex items-center gap-2">
             <span className="text-xl">🔥</span> 지금 뜨거운 투표
           </h2>
-          <Link href="/votes">
-            <a className="text-xs text-muted-foreground flex items-center">전체보기 <ChevronRight className="w-3 h-3" /></a>
-          </Link>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setLocation("/votes")}
+            className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1"
+          >
+            전체보기 <ChevronRight className="w-3 h-3" />
+          </Button>
         </div>
 
         {heroLoading ? (
@@ -56,10 +66,16 @@ export default function Home() {
               </div>
 
               <div className="grid grid-cols-2 gap-3 mt-2">
-                <Button className="bg-white text-primary hover:bg-white/90 font-bold rounded-xl h-12">
+                <Button
+                  onClick={() => checkAuthOrLogin(() => toast({ title: "투표가 완료되었습니다." }))}
+                  className="bg-white text-primary hover:bg-white/90 font-bold rounded-xl h-12"
+                >
                   O 찬성
                 </Button>
-                <Button className="bg-slate-200 text-slate-600 hover:bg-slate-300 border-none font-bold rounded-xl h-12">
+                <Button
+                  onClick={() => checkAuthOrLogin(() => toast({ title: "투표가 완료되었습니다." }))}
+                  className="bg-slate-200 text-slate-600 hover:bg-slate-300 border-none font-bold rounded-xl h-12"
+                >
                   X 반대
                 </Button>
               </div>
@@ -78,16 +94,25 @@ export default function Home() {
           <h2 className="text-lg font-bold flex items-center gap-2">
             <span className="text-xl">✏️</span> 오늘의 시민 목소리
           </h2>
-          <Link href="/suggestions">
-            <a className="text-xs text-muted-foreground flex items-center">더 보기 <ChevronRight className="w-3 h-3" /></a>
-          </Link>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setLocation("/suggestions")}
+            className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1"
+          >
+            더 보기 <ChevronRight className="w-3 h-3" />
+          </Button>
         </div>
 
         <div className="flex flex-col gap-3">
           {suggestionsLoading ? (
             [1, 2].map(i => <Skeleton key={i} className="h-24 w-full rounded-2xl" />)
           ) : suggestions?.data?.slice(0, 3).map((item) => (
-            <Card key={item.id} className="border-none shadow-sm hover:shadow-md transition-shadow rounded-2xl bg-white">
+            <Card
+              key={item.id}
+              onClick={() => checkAuthOrLogin(() => setLocation(`/suggestions?id=${item.id}`))}
+              className="border-none shadow-sm hover:shadow-md transition-shadow rounded-2xl bg-white cursor-pointer relative"
+            >
               <CardContent className="p-4">
                 <div className="flex gap-3">
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -102,24 +127,25 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
-                <Link href={`/suggestions/${item.id}`}>
-                  <a className="absolute inset-0" />
-                </Link>
-              </CardContent>
-            </Card>
-          ))}
-          <Button variant="outline" className="w-full rounded-xl border-dashed py-6 text-muted-foreground hover:text-primary hover:bg-primary/5 group" asChild>
-            <Link href="/suggestions">
-              <div className="flex items-center gap-2">
-                <Plus className="w-4 h-4" /> 새로운 의견 남기기
               </div>
-            </Link>
-          </Button>
+            </div>
+              </CardContent>
+      </Card>
+          ))}
+      <Button
+        variant="outline"
+        className="w-full rounded-xl border-dashed py-6 text-muted-foreground hover:text-primary hover:bg-primary/5 group"
+        onClick={() => checkAuthOrLogin(() => setLocation("/suggestions"))}
+      >
+        <div className="flex items-center gap-2">
+          <Plus className="w-4 h-4" /> 새로운 의견 남기기
         </div>
-      </section>
+      </Button>
+    </div>
+      </section >
 
-      {/* Hong Seong-hoon TV */}
-      <section>
+    {/* Hong Seong-hoon TV */ }
+    < section >
         <div className="flex items-center justify-between mb-3 px-1">
           <h2 className="text-lg font-bold flex items-center gap-2">
             <span className="text-xl">📺</span> 홍성훈 TV
@@ -143,16 +169,16 @@ export default function Home() {
             </Card>
           ))}
         </div>
-      </section>
+      </section >
 
-      {/* Floating Action Button */}
-      <Button className="fixed bottom-20 right-6 w-14 h-14 rounded-full shadow-lg bg-primary hover:bg-primary/90 p-0 flex items-center justify-center border-none z-40 transition-transform active:scale-95">
-        <Link href="/suggestions">
-          <div className="flex items-center justify-center w-full h-full">
-            <Plus className="w-6 h-6 text-white" />
-          </div>
-        </Link>
-      </Button>
-    </div>
+    {/* Floating Action Button */ }
+    < Button
+  onClick = {() => checkAuthOrLogin(() => setLocation("/suggestions"))
+}
+className = "fixed bottom-20 right-6 w-14 h-14 rounded-full shadow-lg bg-primary hover:bg-primary/90 p-0 flex items-center justify-center border-none z-40 transition-transform active:scale-95"
+  >
+  <Plus className="w-6 h-6 text-white" />
+      </Button >
+    </div >
   );
 }

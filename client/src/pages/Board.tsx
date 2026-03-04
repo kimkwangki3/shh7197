@@ -25,13 +25,16 @@ import {
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function BoardPage() {
     const { toast } = useToast();
+    const { checkAuthOrLogin } = useAuth();
     const [filter, setFilter] = useState("all");
     const [searchQuery, setSearchQuery] = useState("");
     const [showWriteForm, setShowWriteForm] = useState(false);
     const [formData, setFormData] = useState({ title: "", content: "", type: "free" });
+    const [selectedPost, setSelectedPost] = useState<Board | null>(null);
 
     const { data: posts, isLoading } = useQuery<{ success: boolean; data: Board[] }>({
         queryKey: ["/api/board", { type: filter }],
@@ -83,7 +86,7 @@ export default function BoardPage() {
                     </div>
                     {!showWriteForm && (
                         <Button
-                            onClick={() => setShowWriteForm(true)}
+                            onClick={() => checkAuthOrLogin(() => setShowWriteForm(true))}
                             className="bg-primary text-white rounded-2xl h-11 px-6 font-bold shadow-lg shadow-blue-100 flex items-center gap-2"
                         >
                             <Edit3 className="w-4 h-4" /> 글쓰기
@@ -190,6 +193,7 @@ export default function BoardPage() {
                                 filteredPosts?.map((post) => (
                                     <Card
                                         key={post.id}
+                                        onClick={() => checkAuthOrLogin(() => setSelectedPost(post))}
                                         className={cn(
                                             "border-none shadow-[0_4px_12px_rgba(0,0,0,0.03)] rounded-[24px] overflow-hidden transition-all hover:shadow-[0_8px_20px_rgba(0,0,0,0.06)] hover:translate-y-[-2px] cursor-pointer bg-white",
                                             post.isPinned ? 'ring-2 ring-primary/10' : ''
@@ -250,6 +254,43 @@ export default function BoardPage() {
                             )}
                         </div>
                     </>
+                )}
+
+                {/* Post Detail Modal/View */}
+                {selectedPost && (
+                    <Card className="border-none shadow-2xl rounded-[32px] bg-white overflow-hidden animate-in fade-in zoom-in-95 duration-200 fixed inset-x-4 top-[10%] bottom-[10%] z-[60] flex flex-col mx-auto max-w-[440px]">
+                        <div className="p-6 flex flex-col h-full">
+                            <div className="flex justify-between items-center mb-6">
+                                <Badge className="bg-primary/5 text-primary border-none font-bold">
+                                    {selectedPost.type === 'notice' ? '공지사항' : selectedPost.type === 'policy' ? '정책소식' : '자유게시판'}
+                                </Badge>
+                                <button onClick={() => setSelectedPost(null)} className="p-2 text-slate-400">
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto no-scrollbar space-y-4">
+                                <h3 className="text-xl font-black text-slate-900 leading-tight">{selectedPost.title}</h3>
+                                <div className="flex items-center gap-3 text-slate-400 text-xs font-medium">
+                                    <div className="flex items-center gap-1">
+                                        <Calendar className="w-3.5 h-3.5" />
+                                        {format(new Date(selectedPost.createdAt), "yyyy.MM.dd", { locale: ko })}
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <Eye className="w-3.5 h-3.5" />
+                                        {selectedPost.viewCount}
+                                    </div>
+                                </div>
+                                <div className="h-[1px] bg-slate-100" />
+                                <p className="text-[15px] text-slate-600 leading-[1.7] whitespace-pre-wrap font-medium">
+                                    {selectedPost.content}
+                                </p>
+                            </div>
+                        </div>
+                    </Card>
+                )}
+                {selectedPost && (
+                    <div className="fixed inset-0 bg-black/20 z-[55] backdrop-blur-sm" onClick={() => setSelectedPost(null)} />
                 )}
             </div>
         </div>

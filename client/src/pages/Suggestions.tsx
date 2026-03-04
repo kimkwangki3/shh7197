@@ -26,12 +26,16 @@ import {
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
+import { useAuth } from "@/hooks/use-auth";
+import { Badge } from "@/components/ui/badge";
 
 export default function Suggestions() {
     const { toast } = useToast();
+    const { checkAuthOrLogin } = useAuth();
     const [showForm, setShowForm] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [formData, setFormData] = useState({ title: "", content: "", category: "정책제안" });
+    const [selectedSuggestion, setSelectedSuggestion] = useState<Suggestion | null>(null);
 
     const { data: suggestions, isLoading } = useQuery<{ success: boolean; data: Suggestion[] }>({
         queryKey: ["/api/suggestions"],
@@ -84,7 +88,7 @@ export default function Suggestions() {
                         </div>
                         {!showForm && (
                             <Button
-                                onClick={() => setShowForm(true)}
+                                onClick={() => checkAuthOrLogin(() => setShowForm(true))}
                                 className="bg-primary text-white w-12 h-12 rounded-2xl p-0 shadow-lg shadow-blue-100 flex items-center justify-center transition-transform active:scale-95"
                             >
                                 <Plus className="w-6 h-6" />
@@ -194,8 +198,8 @@ export default function Suggestions() {
                                 </div>
                             ) : (
                                 filteredSuggestions?.map((item) => (
-                                    <div key={item.id} className="group relative">
-                                        <Card className="border-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-[28px] bg-white overflow-hidden transition-all duration-300 hover:shadow-[0_20px_40px_rgba(0,0,0,0.08)] hover:-translate-y-1">
+                                    <div key={item.id} className="group relative" onClick={() => checkAuthOrLogin(() => setSelectedSuggestion(item))}>
+                                        <Card className="border-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-[28px] bg-white overflow-hidden transition-all duration-300 hover:shadow-[0_20px_40px_rgba(0,0,0,0.08)] hover:-translate-y-1 cursor-pointer">
                                             <CardContent className="p-0">
                                                 {/* Question Section */}
                                                 <div className="p-6 pb-5">
@@ -254,6 +258,65 @@ export default function Suggestions() {
                             )}
                         </div>
                     </>
+                )}
+
+                {/* Suggestion Detail Modal/View */}
+                {selectedSuggestion && (
+                    <Card className="border-none shadow-2xl rounded-[32px] bg-white overflow-hidden animate-in fade-in zoom-in-95 duration-200 fixed inset-x-4 top-[10%] bottom-[10%] z-[60] flex flex-col mx-auto max-w-[440px]">
+                        <div className="p-7 flex flex-col h-full">
+                            <div className="flex justify-between items-center mb-6">
+                                <Badge className={cn(
+                                    "border-none font-bold",
+                                    selectedSuggestion.category === '정책제안' ? "bg-blue-50 text-blue-600" :
+                                        selectedSuggestion.category === '민원/건의' ? "bg-red-50 text-red-600" :
+                                            "bg-slate-50 text-slate-500"
+                                )}>
+                                    {selectedSuggestion.category}
+                                </Badge>
+                                <button onClick={() => setSelectedSuggestion(null)} className="p-2 text-slate-400">
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto no-scrollbar space-y-6">
+                                <div className="space-y-3">
+                                    <h3 className="text-xl font-black text-slate-900 leading-tight">{selectedSuggestion.title}</h3>
+                                    <div className="flex items-center gap-3 text-slate-400 text-xs font-medium">
+                                        <div className="flex items-center gap-1">
+                                            <Calendar className="w-3.5 h-3.5" />
+                                            {format(new Date(selectedSuggestion.createdAt), "yyyy.MM.dd", { locale: ko })}
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <ThumbsUp className="w-3.5 h-3.5" />
+                                            공감 {selectedSuggestion.likeCount}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="h-[1px] bg-slate-100" />
+                                <div className="space-y-4">
+                                    <div className="flex gap-4">
+                                        <div className="flex-shrink-0 w-10 h-10 rounded-2xl bg-slate-50 flex items-center justify-center font-black text-[18px] text-slate-400">Q</div>
+                                        <p className="text-[15px] text-slate-600 leading-[1.7] whitespace-pre-wrap font-medium flex-1">
+                                            {selectedSuggestion.content}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <Button
+                                className="w-full h-14 rounded-2xl bg-primary/5 text-primary hover:bg-primary/10 font-black text-[15px] mt-6 flex items-center justify-center gap-2 border-none"
+                                onClick={() => {
+                                    // Like functionality could be added here
+                                    toast({ title: "공감이 표시되었습니다." });
+                                }}
+                            >
+                                <ThumbsUp className="w-4 h-4" /> 저도 이 의견에 공감해요!
+                            </Button>
+                        </div>
+                    </Card>
+                )}
+                {selectedSuggestion && (
+                    <div className="fixed inset-0 bg-black/20 z-[55] backdrop-blur-sm" onClick={() => setSelectedSuggestion(null)} />
                 )}
             </div>
         </div>

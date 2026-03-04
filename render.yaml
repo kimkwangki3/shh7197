@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: shh7197-app
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: shh7197-db
+          property: connectionString
+
+databases:
+  - name: shh7197-db
+    plan: free

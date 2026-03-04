@@ -127,25 +127,23 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
               </CardContent>
-      </Card>
+            </Card>
           ))}
-      <Button
-        variant="outline"
-        className="w-full rounded-xl border-dashed py-6 text-muted-foreground hover:text-primary hover:bg-primary/5 group"
-        onClick={() => checkAuthOrLogin(() => setLocation("/suggestions"))}
-      >
-        <div className="flex items-center gap-2">
-          <Plus className="w-4 h-4" /> 새로운 의견 남기기
+          <Button
+            variant="outline"
+            className="w-full rounded-xl border-dashed py-6 text-muted-foreground hover:text-primary hover:bg-primary/5 group"
+            onClick={() => checkAuthOrLogin(() => setLocation("/suggestions"))}
+          >
+            <div className="flex items-center gap-2">
+              <Plus className="w-4 h-4" /> 새로운 의견 남기기
+            </div>
+          </Button>
         </div>
-      </Button>
-    </div>
-      </section >
+      </section>
 
-    {/* Hong Seong-hoon TV */ }
-    < section >
+      {/* Hong Seong-hoon TV */}
+      <section>
         <div className="flex items-center justify-between mb-3 px-1">
           <h2 className="text-lg font-bold flex items-center gap-2">
             <span className="text-xl">📺</span> 홍성훈 TV
@@ -169,16 +167,15 @@ export default function Home() {
             </Card>
           ))}
         </div>
-      </section >
+      </section>
 
-    {/* Floating Action Button */ }
-    < Button
-  onClick = {() => checkAuthOrLogin(() => setLocation("/suggestions"))
-}
-className = "fixed bottom-20 right-6 w-14 h-14 rounded-full shadow-lg bg-primary hover:bg-primary/90 p-0 flex items-center justify-center border-none z-40 transition-transform active:scale-95"
-  >
-  <Plus className="w-6 h-6 text-white" />
-      </Button >
-    </div >
+      {/* Floating Action Button */}
+      <Button
+        onClick={() => checkAuthOrLogin(() => setLocation("/suggestions"))}
+        className="fixed bottom-20 right-6 w-14 h-14 rounded-full shadow-lg bg-primary hover:bg-primary/90 p-0 flex items-center justify-center border-none z-40 transition-transform active:scale-95"
+      >
+        <Plus className="w-6 h-6 text-white" />
+      </Button>
+    </div>
   );
 }

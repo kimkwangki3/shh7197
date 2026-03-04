@@ -1,6 +1,6 @@
-import { 
-  users, 
-  messages, 
+import {
+  users,
+  messages,
   candidateInfo,
   timelineEntries,
   policyAreas,
@@ -8,9 +8,9 @@ import {
   officeHours,
   socialLinks,
   statistics,
-  type User, 
-  type InsertUser, 
-  type Message, 
+  type User,
+  type InsertUser,
+  type Message,
   type InsertMessage,
   type CandidateInfo,
   type InsertCandidateInfo,
@@ -25,9 +25,24 @@ import {
   type SocialLink,
   type InsertSocialLink,
   type Statistic,
-  type InsertStatistic
-} from "@shared/schema";
-import { db } from "./db";
+  type InsertStatistic,
+  votes,
+  suggestions,
+  boards,
+  promises,
+  comments,
+  type Vote,
+  type InsertVote,
+  type Suggestion,
+  type InsertSuggestion,
+  type Board,
+  type InsertBoard,
+  type PromiseItem,
+  type InsertPromise,
+  type Comment,
+  type InsertComment
+} from "../shared/schema.ts";
+import { db } from "./db.ts";
 import { eq, desc, asc } from "drizzle-orm";
 
 // modify the interface with any CRUD methods
@@ -37,52 +52,79 @@ export interface IStorage {
   // User methods
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByKakaoId(kakaoId: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  
+
   // Message methods
   createMessage(message: InsertMessage): Promise<Message>;
   getAllMessages(): Promise<Message[]>;
   getMessage(id: string): Promise<Message | undefined>;
-  
+
   // Candidate info methods
   getCandidateInfo(): Promise<CandidateInfo | undefined>;
   updateCandidateInfo(info: InsertCandidateInfo): Promise<CandidateInfo>;
-  
+
   // Timeline methods
   getAllTimelineEntries(): Promise<TimelineEntry[]>;
   createTimelineEntry(entry: InsertTimelineEntry): Promise<TimelineEntry>;
   updateTimelineEntry(id: string, entry: Partial<InsertTimelineEntry>): Promise<TimelineEntry>;
   deleteTimelineEntry(id: string): Promise<void>;
-  
+
   // Policy area methods
   getAllPolicyAreas(): Promise<PolicyArea[]>;
   createPolicyArea(area: InsertPolicyArea): Promise<PolicyArea>;
   updatePolicyArea(id: string, area: Partial<InsertPolicyArea>): Promise<PolicyArea>;
   deletePolicyArea(id: string): Promise<void>;
-  
+
   // Contact detail methods
   getAllContactDetails(): Promise<ContactDetail[]>;
   createContactDetail(detail: InsertContactDetail): Promise<ContactDetail>;
   updateContactDetail(id: string, detail: Partial<InsertContactDetail>): Promise<ContactDetail>;
   deleteContactDetail(id: string): Promise<void>;
-  
+
   // Office hours methods
   getAllOfficeHours(): Promise<OfficeHour[]>;
   createOfficeHour(hour: InsertOfficeHour): Promise<OfficeHour>;
   updateOfficeHour(id: string, hour: Partial<InsertOfficeHour>): Promise<OfficeHour>;
   deleteOfficeHour(id: string): Promise<void>;
-  
+
   // Social link methods
   getAllSocialLinks(): Promise<SocialLink[]>;
   createSocialLink(link: InsertSocialLink): Promise<SocialLink>;
   updateSocialLink(id: string, link: Partial<InsertSocialLink>): Promise<SocialLink>;
   deleteSocialLink(id: string): Promise<void>;
-  
+
   // Statistics methods
   getAllStatistics(): Promise<Statistic[]>;
   createStatistic(stat: InsertStatistic): Promise<Statistic>;
   updateStatistic(id: string, stat: Partial<InsertStatistic>): Promise<Statistic>;
   deleteStatistic(id: string): Promise<void>;
+
+  // Vote methods
+  getAllVotes(): Promise<Vote[]>;
+  getHeroVote(): Promise<Vote | undefined>;
+  getVote(id: string): Promise<Vote | undefined>;
+  createVote(vote: InsertVote): Promise<Vote>;
+  updateVoteCount(id: string, type: 'agree' | 'disagree'): Promise<Vote>;
+
+  // Suggestion methods
+  getAllSuggestions(): Promise<Suggestion[]>;
+  createSuggestion(suggestion: InsertSuggestion): Promise<Suggestion>;
+  updateSuggestionLikes(id: string): Promise<Suggestion>;
+
+  // Board methods
+  getBoardItems(type?: string): Promise<Board[]>;
+  getBoardItem(id: string): Promise<Board | undefined>;
+  createBoardItem(item: InsertBoard): Promise<Board>;
+
+  // Promise methods
+  getAllPromises(): Promise<PromiseItem[]>;
+  getPromisesByCategory(category: string): Promise<PromiseItem[]>;
+  createPromise(promise: InsertPromise): Promise<PromiseItem>;
+
+  // Comment methods
+  getComments(targetType: string, targetId: string): Promise<Comment[]>;
+  createComment(comment: InsertComment): Promise<Comment>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -93,6 +135,11 @@ export class DatabaseStorage implements IStorage {
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+
+  async getUserByKakaoId(kakaoId: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.kakaoId, kakaoId));
     return user || undefined;
   }
 
@@ -319,6 +366,155 @@ export class DatabaseStorage implements IStorage {
 
   async deleteStatistic(id: string): Promise<void> {
     await db.delete(statistics).where(eq(statistics.id, id));
+  }
+
+  // Vote methods
+  async getAllVotes(): Promise<Vote[]> {
+    return await db.select().from(votes).orderBy(desc(votes.createdAt));
+  }
+
+  async getHeroVote(): Promise<Vote | undefined> {
+    const [vote] = await db.select().from(votes).where(eq(votes.isHero, true)).limit(1);
+    return vote || undefined;
+  }
+
+  async getVote(id: string): Promise<Vote | undefined> {
+    const [vote] = await db.select().from(votes).where(eq(votes.id, id));
+    return vote || undefined;
+  }
+
+  async createVote(insertVote: InsertVote): Promise<Vote> {
+    const [vote] = await db.insert(votes).values(insertVote).returning();
+    return vote;
+  }
+
+  async updateVoteCount(id: string, type: "agree" | "disagree"): Promise<Vote> {
+    const [vote] = await db
+      .update(votes)
+      .set({
+        agreeCount: type === "agree" ? sql`${votes.agreeCount} + 1` : votes.agreeCount,
+        disagreeCount: type === "disagree" ? sql`${votes.disagreeCount} + 1` : votes.disagreeCount,
+        updatedAt: new Date(),
+      })
+      .where(eq(votes.id, id))
+      .returning();
+    if (!vote) throw new Error("Vote not found");
+    return vote;
+  }
+
+  async updateVote(id: string, updateVote: Partial<InsertVote>): Promise<Vote> {
+    const [vote] = await db
+      .update(votes)
+      .set({ ...updateVote, updatedAt: new Date() })
+      .where(eq(votes.id, id))
+      .returning();
+    if (!vote) throw new Error("Vote not found");
+    return vote;
+  }
+
+  async deleteVote(id: string): Promise<void> {
+    await db.delete(votes).where(eq(votes.id, id));
+  }
+  // Suggestion methods
+  async getAllSuggestions(): Promise<Suggestion[]> {
+    return await db.select().from(suggestions).orderBy(desc(suggestions.createdAt));
+  }
+
+  async createSuggestion(insertSuggestion: InsertSuggestion): Promise<Suggestion> {
+    const [suggestion] = await db.insert(suggestions).values(insertSuggestion).returning();
+    return suggestion;
+  }
+
+  async updateSuggestionLikes(id: string): Promise<Suggestion> {
+    const [suggestion] = await db
+      .update(suggestions)
+      .set({ likeCount: sql`${suggestions.likeCount} + 1` })
+      .where(eq(suggestions.id, id))
+      .returning();
+    if (!suggestion) throw new Error("Suggestion not found");
+    return suggestion;
+  }
+
+  async deleteSuggestion(id: string): Promise<void> {
+    await db.delete(suggestions).where(eq(suggestions.id, id));
+  }
+
+  // Board methods
+  async getBoardItems(type?: string): Promise<Board[]> {
+    let query = db.select().from(boards);
+    if (type) {
+      // @ts-ignore
+      query = query.where(eq(boards.type, type));
+    }
+    return await query.orderBy(desc(boards.isPinned), desc(boards.createdAt));
+  }
+
+  async getBoardItem(id: string): Promise<Board | undefined> {
+    const [item] = await db.select().from(boards).where(eq(boards.id, id));
+    return item || undefined;
+  }
+
+  async createBoardItem(item: InsertBoard): Promise<Board> {
+    const [board] = await db.insert(boards).values(item).returning();
+    return board;
+  }
+
+  async updateBoardItem(id: string, updateItem: Partial<InsertBoard>): Promise<Board> {
+    const [board] = await db
+      .update(boards)
+      .set({ ...updateItem, updatedAt: new Date() })
+      .where(eq(boards.id, id))
+      .returning();
+    if (!board) throw new Error("Board item not found");
+    return board;
+  }
+
+  async deleteBoardItem(id: string): Promise<void> {
+    await db.delete(boards).where(eq(boards.id, id));
+  }
+
+  // Promise methods
+  async getAllPromises(): Promise<PromiseItem[]> {
+    return await db.select().from(promises).orderBy(asc(promises.sortOrder));
+  }
+
+  async getPromisesByCategory(category: string): Promise<PromiseItem[]> {
+    return await db.select().from(promises).where(eq(promises.category, category)).orderBy(asc(promises.sortOrder));
+  }
+
+  async createPromise(promise: InsertPromise): Promise<PromiseItem> {
+    const [item] = await db.insert(promises).values(promise).returning();
+    return item;
+  }
+
+  async updatePromise(id: string, updateItem: Partial<InsertPromise>): Promise<PromiseItem> {
+    const [item] = await db
+      .update(promises)
+      .set({ ...updateItem })
+      .where(eq(promises.id, id))
+      .returning();
+    if (!item) throw new Error("Promise not found");
+    return item;
+  }
+
+  async deletePromise(id: string): Promise<void> {
+    await db.delete(promises).where(eq(promises.id, id));
+  }
+
+  // Comment methods
+  async getComments(targetType: string, targetId: string): Promise<Comment[]> {
+    return await db
+      .select()
+      .from(comments)
+      .where(eq(comments.targetType, targetType))
+      // @ts-ignore
+      .where(eq(comments.targetId, targetId))
+      .orderBy(desc(comments.createdAt));
+  }
+
+  async createComment(insertComment: InsertComment): Promise<Comment> {
+    const [comment] = await db.insert(comments).values(insertComment).returning();
+    return comment;
   }
 }
 

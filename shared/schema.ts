@@ -7,6 +7,11 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
+  kakaoId: text("kakao_id").unique(),
+  avatarUrl: text("avatar_url"),
+  nickname: text("nickname"),
+  isAdmin: boolean("is_admin").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
 export const messages = pgTable("messages", {
@@ -21,6 +26,12 @@ export const messages = pgTable("messages", {
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
+  kakaoId: true,
+  avatarUrl: true,
+  nickname: true,
+  isAdmin: true,
+}).extend({
+  username: z.string().min(1, "사용자 아이디를 입력해주세요"),
 });
 
 export const insertMessageSchema = createInsertSchema(messages).omit({
@@ -122,6 +133,69 @@ export const statistics = pgTable("statistics", {
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });
 
+// 시민 참여 투표
+export const votes = pgTable("votes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  category: text("category").notNull(), // 교통, 복지, 환경 등
+  endDate: timestamp("end_date").notNull(),
+  agreeCount: integer("agree_count").notNull().default(0),
+  disagreeCount: integer("disagree_count").notNull().default(0),
+  isHero: boolean("is_hero").notNull().default(false), // 지금 뜨거운 투표 여부
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+// 시민 의견 제안
+export const suggestions = pgTable("suggestions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  category: text("category").notNull(),
+  authorId: varchar("author_id"), // 회원 기능 시 활용
+  likeCount: integer("like_count").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// 게시판 (공지/자유)
+export const boards = pgTable("boards", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type").notNull(), // notice, policy, free
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  isPinned: boolean("is_pinned").notNull().default(false),
+  viewCount: integer("view_count").notNull().default(0),
+  likeCount: integer("like_count").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+// 공약 및 이행 상태
+export const promises = pgTable("promises", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  category: text("category").notNull(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  keyPoints: text("key_points").array().notNull().default([]),
+  status: text("status").notNull(), // 진행중, 이행완료, 계획중
+  progress: integer("progress").notNull().default(0), // 0-100
+  imageUrl: text("image_url"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// 댓글
+export const comments = pgTable("comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  targetType: text("target_type").notNull(), // vote, suggestion, board
+  targetId: varchar("target_id").notNull(),
+  content: text("content").notNull(),
+  authorId: varchar("author_id"),
+  likeCount: integer("like_count").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
 // Insert schemas
 export const insertCandidateInfoSchema = createInsertSchema(candidateInfo).omit({
   id: true,
@@ -165,6 +239,33 @@ export const insertStatisticSchema = createInsertSchema(statistics).omit({
   updatedAt: true,
 });
 
+export const insertVoteSchema = createInsertSchema(votes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertSuggestionSchema = createInsertSchema(suggestions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertBoardSchema = createInsertSchema(boards).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPromiseSchema = createInsertSchema(promises).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCommentSchema = createInsertSchema(comments).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -185,3 +286,14 @@ export type SocialLink = typeof socialLinks.$inferSelect;
 export type InsertSocialLink = z.infer<typeof insertSocialLinkSchema>;
 export type Statistic = typeof statistics.$inferSelect;
 export type InsertStatistic = z.infer<typeof insertStatisticSchema>;
+
+export type Vote = typeof votes.$inferSelect;
+export type InsertVote = z.infer<typeof insertVoteSchema>;
+export type Suggestion = typeof suggestions.$inferSelect;
+export type InsertSuggestion = z.infer<typeof insertSuggestionSchema>;
+export type Board = typeof boards.$inferSelect;
+export type InsertBoard = z.infer<typeof insertBoardSchema>;
+export type PromiseItem = typeof promises.$inferSelect;
+export type InsertPromise = z.infer<typeof insertPromiseSchema>;
+export type Comment = typeof comments.$inferSelect;
+export type InsertComment = z.infer<typeof insertCommentSchema>;

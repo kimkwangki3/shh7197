@@ -1,0 +1,257 @@
+import React, { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Board } from "@shared/schema";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import {
+    Search,
+    Pin,
+    Calendar,
+    Eye,
+    Edit3,
+    ChevronRight,
+    Plus,
+    X,
+    FileText,
+    MessageSquare,
+    ChevronLeft
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { ko } from "date-fns/locale";
+
+export default function BoardPage() {
+    const { toast } = useToast();
+    const [filter, setFilter] = useState("all");
+    const [searchQuery, setSearchQuery] = useState("");
+    const [showWriteForm, setShowWriteForm] = useState(false);
+    const [formData, setFormData] = useState({ title: "", content: "", type: "free" });
+
+    const { data: posts, isLoading } = useQuery<{ success: boolean; data: Board[] }>({
+        queryKey: ["/api/board", { type: filter }],
+    });
+
+    const mutation = useMutation({
+        mutationFn: async (data: any) => {
+            const res = await apiRequest("POST", "/api/board", data);
+            return res.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["/api/board"] });
+            setShowWriteForm(false);
+            setFormData({ title: "", content: "", type: "free" });
+            toast({ title: "게시글이 등록되었습니다.", description: "커뮤니티 활동에 감사드립니다!" });
+        },
+    });
+
+    const categories = [
+        { id: "all", label: "전체" },
+        { id: "notice", label: "공지사항" },
+        { id: "policy", label: "정책소식" },
+        { id: "free", label: "자유게시판" },
+    ];
+
+    const filteredPosts = posts?.data?.filter(post =>
+        post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        post.content.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    if (isLoading && !posts) {
+        return (
+            <div className="p-4 space-y-4">
+                <Skeleton className="h-10 w-48 rounded-lg" />
+                <Skeleton className="h-12 w-full rounded-2xl" />
+                {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-28 w-full rounded-2xl" />)}
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-h-screen bg-slate-50/50 pb-20">
+            {/* Header Area */}
+            <div className="bg-white px-5 pt-8 pb-6 border-b border-slate-100">
+                <div className="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 className="text-[26px] font-black text-primary leading-tight mb-1 tracking-tight">시민 게시판</h2>
+                        <p className="text-sm text-slate-400 font-medium">소통과 소식이 한자리에</p>
+                    </div>
+                    {!showWriteForm && (
+                        <Button
+                            onClick={() => setShowWriteForm(true)}
+                            className="bg-primary text-white rounded-2xl h-11 px-6 font-bold shadow-lg shadow-blue-100 flex items-center gap-2"
+                        >
+                            <Edit3 className="w-4 h-4" /> 글쓰기
+                        </Button>
+                    )}
+                </div>
+
+                <div className="relative group">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 group-focus-within:text-primary transition-colors" />
+                    <Input
+                        placeholder="제목, 내용을 검색하세요"
+                        className="w-full pl-11 pr-4 h-12 bg-slate-50 border-none rounded-2xl text-[15px] focus:ring-2 focus:ring-primary/10 transition-all font-medium"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                </div>
+            </div>
+
+            {/* Content Area */}
+            <div className="p-5 flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+
+                {showWriteForm ? (
+                    <Card className="border-none shadow-xl shadow-blue-900/5 rounded-3xl bg-white overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6 space-y-5">
+                            <div className="flex justify-between items-center">
+                                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                    <FileText className="w-5 h-5 text-primary" /> 새 게시글 작성
+                                </h3>
+                                <button onClick={() => setShowWriteForm(false)} className="text-slate-400 p-2">
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="flex gap-2">
+                                    {categories.filter(c => c.id !== 'all').map((cat) => (
+                                        <button
+                                            key={cat.id}
+                                            onClick={() => setFormData({ ...formData, type: cat.id })}
+                                            className={cn(
+                                                "py-2 px-4 rounded-xl text-xs font-bold transition-all border",
+                                                formData.type === cat.id
+                                                    ? "bg-primary border-primary text-white"
+                                                    : "bg-white border-slate-100 text-slate-500 hover:bg-slate-50"
+                                            )}
+                                        >
+                                            {cat.label}
+                                        </button>
+                                    ))}
+                                </div>
+                                <Input
+                                    placeholder="제목을 입력하세요"
+                                    className="h-12 rounded-xl bg-slate-50 border-none font-bold text-[15px] focus:bg-white focus:ring-primary/20"
+                                    value={formData.title}
+                                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                                />
+                                <Textarea
+                                    placeholder="동탄 시민들과 나누고 싶은 이야기를 적어주세요."
+                                    className="min-h-[180px] rounded-xl bg-slate-50 border-none p-4 text-[14px] leading-relaxed resize-none focus:bg-white focus:ring-primary/20"
+                                    value={formData.content}
+                                    onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                                />
+                            </div>
+
+                            <Button
+                                className="w-full h-13 rounded-2xl bg-primary text-white font-black text-base shadow-lg shadow-blue-100"
+                                onClick={() => mutation.mutate(formData)}
+                                disabled={mutation.isPending || !formData.title || !formData.content}
+                            >
+                                게시글 올리기
+                            </Button>
+                        </div>
+                    </Card>
+                ) : (
+                    <>
+                        {/* Category Selector */}
+                        <div className="flex gap-2.5 overflow-x-auto pb-1 no-scrollbar -mx-1 px-1">
+                            {categories.map((cat) => (
+                                <button
+                                    key={cat.id}
+                                    onClick={() => setFilter(cat.id)}
+                                    className={cn(
+                                        "px-5 py-2.5 rounded-2xl whitespace-nowrap text-[13px] font-black transition-all border-none",
+                                        filter === cat.id
+                                            ? "bg-primary text-white shadow-md shadow-blue-100"
+                                            : "bg-white text-slate-400 shadow-sm hover:bg-slate-50"
+                                    )}
+                                >
+                                    {cat.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Post List */}
+                        <div className="flex flex-col gap-4">
+                            {filteredPosts?.length === 0 ? (
+                                <div className="py-24 text-center">
+                                    <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                                        <FileText className="w-8 h-8 text-slate-300" />
+                                    </div>
+                                    <p className="text-[14px] font-bold text-slate-400">등록된 게시글이 없습니다.</p>
+                                </div>
+                            ) : (
+                                filteredPosts?.map((post) => (
+                                    <Card
+                                        key={post.id}
+                                        className={cn(
+                                            "border-none shadow-[0_4px_12px_rgba(0,0,0,0.03)] rounded-[24px] overflow-hidden transition-all hover:shadow-[0_8px_20px_rgba(0,0,0,0.06)] hover:translate-y-[-2px] cursor-pointer bg-white",
+                                            post.isPinned ? 'ring-2 ring-primary/10' : ''
+                                        )}
+                                    >
+                                        <CardContent className="p-6">
+                                            <div className="flex flex-col gap-3">
+                                                <div className="flex justify-between items-center">
+                                                    <div className="flex items-center gap-2">
+                                                        {post.isPinned && (
+                                                            <div className="w-6 h-6 rounded-full bg-primary/5 flex items-center justify-center">
+                                                                <Pin className="w-3.5 h-3.5 text-primary fill-primary" />
+                                                            </div>
+                                                        )}
+                                                        <span className={cn(
+                                                            "text-[10px] font-black px-2.5 py-1 rounded-full tracking-wide",
+                                                            post.type === 'notice' ? 'bg-red-50 text-red-600' :
+                                                                post.type === 'policy' ? 'bg-blue-50 text-blue-600' :
+                                                                    'bg-slate-100 text-slate-500'
+                                                        )}>
+                                                            {post.type === 'notice' ? '공지사항' :
+                                                                post.type === 'policy' ? '정책소식' : '자유게시판'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 text-slate-400 text-[11px] font-medium">
+                                                        <Calendar className="w-3.5 h-3.5 opacity-50" />
+                                                        {format(new Date(post.createdAt), "yyyy.MM.dd", { locale: ko })}
+                                                    </div>
+                                                </div>
+
+                                                <h4 className="font-extrabold text-[17px] text-slate-800 leading-snug line-clamp-2">
+                                                    {post.title}
+                                                </h4>
+
+                                                <p className="text-[14px] text-slate-500 font-medium line-clamp-1 opacity-70">
+                                                    {post.content}
+                                                </p>
+
+                                                <div className="flex items-center justify-between pt-3 border-t border-slate-50 mt-1">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="flex items-center gap-1.5 text-slate-400">
+                                                            <Eye className="w-4 h-4 opacity-70" />
+                                                            <span className="text-[12px] font-black">{post.viewCount}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1.5 text-slate-400">
+                                                            <MessageSquare className="w-4 h-4 opacity-70" />
+                                                            <span className="text-[12px] font-black">0</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-[11px] font-black text-primary flex items-center gap-0.5">
+                                                        자세히 <ChevronRight className="w-3.5 h-3.5" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                ))
+                            )}
+                        </div>
+                    </>
+                )}
+            </div>
+        </div>
+    );
+}

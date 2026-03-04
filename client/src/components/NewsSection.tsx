@@ -1,8 +1,7 @@
-import { motion } from "framer-motion";
+import React, { useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Calendar, ExternalLink, Newspaper, ChevronLeft, ChevronRight } from "lucide-react";
-import { useState } from "react";
 
 interface NewsArticle {
   id: number;
@@ -15,9 +14,6 @@ interface NewsArticle {
 }
 
 export default function NewsSection() {
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const itemsPerSlide = 4;
-  
   const newsArticles: NewsArticle[] = [
     {
       id: 1,
@@ -110,179 +106,190 @@ export default function NewsSection() {
       category: "주민권익"
     }
   ];
-  
-  const totalSlides = Math.ceil(newsArticles.length / itemsPerSlide);
-  
-  const nextSlide = () => {
-    setCurrentSlide((prev) => (prev + 1) % totalSlides);
-  };
-  
-  const prevSlide = () => {
-    setCurrentSlide((prev) => (prev - 1 + totalSlides) % totalSlides);
-  };
-  
-  const getCurrentItems = () => {
-    const start = currentSlide * itemsPerSlide;
-    const end = start + itemsPerSlide;
-    return newsArticles.slice(start, end);
-  };
+
+  // Group articles by category
+  const categories = Array.from(new Set(newsArticles.map(a => a.category)));
 
   const getCategoryColor = (category: string) => {
     switch (category) {
-      case "봉사활동":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
-      case "지역발전":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
-      case "사회공헌":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300";
-      case "주민권익":
-        return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300";
-      case "환경활동":
-        return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300";
-      case "조직운영":
-        return "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
+      case "봉사활동": return "text-blue-600 bg-blue-50";
+      case "지역발전": return "text-emerald-600 bg-emerald-50";
+      case "사회공헌": return "text-purple-600 bg-purple-50";
+      case "주민권익": return "text-amber-600 bg-amber-50";
+      case "환경활동": return "text-cyan-600 bg-cyan-50";
+      case "조직운영": return "text-indigo-600 bg-indigo-50";
+      default: return "text-slate-600 bg-slate-50";
     }
   };
 
   return (
-    <section id="news" className="py-20 bg-muted/20" data-testid="news-section">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="news" className="py-20 bg-white overflow-hidden">
+      <div className="container mx-auto px-4 max-w-7xl">
         <motion.div
           className="text-center mb-16"
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
           viewport={{ once: true }}
         >
-          <div className="flex items-center justify-center gap-3 mb-6">
-            <Newspaper className="w-8 h-8 text-primary" />
-            <h2 className="text-4xl lg:text-5xl font-bold text-foreground">
-              언론 보도
-            </h2>
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/5 text-primary text-sm font-bold mb-6">
+            <Newspaper className="w-4 h-4" />
+            <span>PRESS NEWS</span>
           </div>
-          <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-            지역 사회 발전을 위한 활동과 주민들의 권익 보호를 위한 노력들이 언론을 통해 소개되었습니다.
-          </p>
+          <h2 className="text-3xl lg:text-5xl font-bold text-slate-900 mb-6 tracking-tight">
+            활동 기록 및 <span className="text-primary italic">언론 보도</span>
+          </h2>
         </motion.div>
 
-        <div className="relative max-w-6xl mx-auto">
-          {/* Navigation Controls */}
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-4">
-              <span className="text-muted-foreground">
-                {currentSlide + 1} / {totalSlides} 페이지
-              </span>
-              <span className="text-sm text-muted-foreground">
-                총 {newsArticles.length}개 기사
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={prevSlide}
-                disabled={currentSlide === 0}
-                className="gap-2"
-                data-testid="button-prev-slide"
-              >
-                <ChevronLeft className="w-4 h-4" />
-                이전
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={nextSlide}
-                disabled={currentSlide === totalSlides - 1}
-                className="gap-2"
-                data-testid="button-next-slide"
-              >
-                다음
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-
-          {/* News Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {getCurrentItems().map((article, index) => (
-              <motion.div
-                key={`${currentSlide}-${article.id}`}
-                initial={{ opacity: 0, x: 50 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -50 }}
-                transition={{ duration: 0.4, delay: index * 0.1 }}
-              >
-                <Card className="h-full hover-elevate transition-all duration-300" data-testid={`news-article-${article.id}`}>
-                  <CardHeader className="pb-4">
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getCategoryColor(article.category)}`}>
-                        {article.category}
-                      </span>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Calendar className="w-4 h-4" />
-                        {article.date}
-                      </div>
-                    </div>
-                    <CardTitle className="text-lg leading-tight line-clamp-2">
-                      {article.title}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-muted-foreground leading-relaxed line-clamp-3">
-                      {article.summary}
-                    </p>
-                    <div className="flex items-center justify-between pt-2">
-                      <span className="text-sm font-medium text-primary">
-                        {article.source}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-2"
-                        onClick={() => window.open(article.link, '_blank')}
-                        data-testid={`button-read-more-${article.id}`}
-                      >
-                        <span>원문 보기</span>
-                        <ExternalLink className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-
-          {/* Slide Indicators */}
-          <div className="flex justify-center gap-2 mt-8">
-            {Array.from({ length: totalSlides }, (_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentSlide(index)}
-                className={`w-3 h-3 rounded-full transition-colors duration-200 ${
-                  index === currentSlide
-                    ? 'bg-primary'
-                    : 'bg-muted-foreground/30 hover:bg-muted-foreground/50'
-                }`}
-                data-testid={`slide-indicator-${index}`}
-              />
-            ))}
-          </div>
+        <div className="space-y-16">
+          {categories.map((category, catIdx) => (
+            <NewsCategoryRow
+              key={category}
+              category={category}
+              catIdx={catIdx}
+              articles={newsArticles.filter(a => a.category === category)}
+              getCategoryColor={getCategoryColor}
+            />
+          ))}
         </div>
-
-        <motion.div
-          className="text-center mt-12"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-          viewport={{ once: true }}
-        >
-          <p className="text-muted-foreground">
-            지역 사회 발전과 주민들의 권익을 위한 지속적인 활동을 이어나가겠습니다.
-          </p>
-        </motion.div>
       </div>
     </section>
+  );
+}
+
+interface CategoryRowProps {
+  key?: string;
+  category: string;
+  catIdx: number;
+  articles: NewsArticle[];
+  getCategoryColor: (cat: string) => string;
+}
+
+function NewsCategoryRow({ category, catIdx, articles, getCategoryColor }: CategoryRowProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [showLeftBtn, setShowLeftBtn] = useState(false);
+  const [showRightBtn, setShowRightBtn] = useState(false);
+
+  const handleScroll = () => {
+    if (scrollRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+      setShowLeftBtn(scrollLeft > 10);
+      setShowRightBtn(scrollLeft < scrollWidth - clientWidth - 10);
+    }
+  };
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => handleScroll(), 100);
+    window.addEventListener('resize', handleScroll);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', handleScroll);
+    };
+  }, [articles]);
+
+  const scrollBy = (offset: number) => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollBy({ left: offset, behavior: 'smooth' });
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <motion.div
+        className="flex items-center gap-3"
+        initial={{ opacity: 0, x: -20 }}
+        whileInView={{ opacity: 1, x: 0 }}
+        transition={{ delay: catIdx * 0.1 }}
+        viewport={{ once: true }}
+      >
+        <div className={`w-1 h-6 rounded-full ${getCategoryColor(category).split(' ')[1]}`} />
+        <h3 className="text-xl font-bold text-slate-900">{category}</h3>
+        <span className="text-sm text-slate-400 font-medium">
+          {articles.length}건
+        </span>
+      </motion.div>
+
+      <div className="relative group/slider">
+        {/* Navigation Buttons */}
+        <AnimatePresence>
+          {articles.length > 1 && showLeftBtn && (
+            <motion.button
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -10 }}
+              onClick={() => scrollBy(-300)}
+              className="absolute -left-4 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white border border-slate-100 rounded-full shadow-lg flex items-center justify-center text-slate-600 hover:text-primary transition-all shadow-md active:scale-95"
+            >
+              <ChevronLeft className="w-6 h-6" />
+            </motion.button>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {articles.length > 1 && showRightBtn && (
+            <motion.button
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 10 }}
+              onClick={() => scrollBy(300)}
+              className="absolute -right-4 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white border border-slate-100 rounded-full shadow-lg flex items-center justify-center text-slate-600 hover:text-primary transition-all shadow-md active:scale-95"
+            >
+              <ChevronRight className="w-6 h-6" />
+            </motion.button>
+          )}
+        </AnimatePresence>
+
+        {/* Horizontal Scroll Container */}
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="flex gap-4 overflow-x-auto pb-6 scrollbar-hide snap-x px-1"
+        >
+          {articles.map((article, idx) => (
+            <motion.div
+              key={article.id}
+              className="min-w-[280px] sm:min-w-[320px] snap-start"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.05 }}
+              viewport={{ once: true }}
+            >
+              <Card className="h-full border-slate-100 shadow-sm hover:shadow-md transition-all group flex flex-col">
+                <CardHeader className="p-5 pb-3">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      {article.date}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-300 uppercase letter-spacing-widest">
+                      {article.source}
+                    </span>
+                  </div>
+                  <CardTitle className="text-base font-bold text-slate-900 leading-snug group-hover:text-primary transition-colors line-clamp-2 min-h-[3rem]">
+                    {article.title}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-5 pb-5 pt-0 flex-1 flex flex-col justify-between">
+                  <p className="text-sm text-slate-500 leading-relaxed line-clamp-3 mb-6">
+                    {article.summary}
+                  </p>
+                  <div className="pt-4 border-t border-slate-50 flex justify-end">
+                    <a
+                      href={article.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-primary group/link"
+                    >
+                      {article.source}에서 원문 보기
+                      <ExternalLink className="w-3 h-3 group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5 transition-transform" />
+                    </a>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }

@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { 
+import {
   insertMessageSchema,
   insertCandidateInfoSchema,
   insertTimelineEntrySchema,
@@ -9,13 +9,62 @@ import {
   insertContactDetailSchema,
   insertOfficeHourSchema,
   insertSocialLinkSchema,
-  insertStatisticSchema
+  insertStatisticSchema,
+  insertVoteSchema,
+  insertSuggestionSchema,
+  insertBoardSchema,
+  insertPromiseSchema,
+  insertCommentSchema
 } from "@shared/schema";
 import { z } from "zod";
 import path from "path";
 import fs from "fs";
 
+// Admin check middleware
+const isAdmin = (req: any, res: any, next: any) => {
+  // For now, since we're using a simplified auth with localStorage on frontend,
+  // we'll rely on the user ID passed or session.
+  // In a real app, this would check the authenticated session.
+  // For this implementation, we'll check a custom header or session if available.
+  if (req.session?.user?.isAdmin || req.user?.isAdmin) {
+    return next();
+  }
+  res.status(403).json({ message: "Admin privileges required" });
+};
+
 export async function registerRoutes(app: Express): Promise<Server> {
+  app.post("/api/auth/kakao", async (req, res) => {
+    try {
+      const { id, nickname, avatarUrl } = req.body;
+
+      if (!id) {
+        return res.status(400).json({ success: false, message: "카카오 ID가 필요합니다." });
+      }
+
+      let user = await storage.getUserByKakaoId(id.toString());
+
+      if (!user) {
+        user = await storage.createUser({
+          username: `kakao_${id}`,
+          password: "kakao_login",
+          kakaoId: id.toString(),
+          nickname: nickname,
+          avatarUrl: avatarUrl,
+          isAdmin: id.toString() === "3924376517" // Placeholder for specific user to be admin
+        });
+
+        if (req.session) {
+          req.session.user = user;
+        }
+      }
+
+      res.json({ success: true, user });
+    } catch (error) {
+      console.error("Kakao login error:", error);
+      res.status(500).json({ success: false, message: "카카오 로그인 처리 중 오류가 발생했습니다." });
+    }
+  });
+
   app.get("/api/download-project", (_req, res) => {
     const filePath = "/tmp/project-files.tar.gz";
     if (fs.existsSync(filePath)) {
@@ -32,18 +81,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Validate request body
       const messageData = insertMessageSchema.parse(req.body);
-      
+
       // Save message to database
       const message = await storage.createMessage(messageData);
-      
-      res.json({ 
-        success: true, 
+
+      res.json({
+        success: true,
         message: "메시지가 성공적으로 전송되었습니다.",
-        id: message.id 
+        id: message.id
       });
     } catch (error) {
       console.error("Error saving message:", error);
-      
+
       if (error instanceof z.ZodError) {
         res.status(400).json({
           success: false,
@@ -428,6 +477,138 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting statistic:", error);
       res.status(500).json({ success: false, message: "통계 삭제 중 오류가 발생했습니다." });
+    }
+  });
+
+  // ==== Citizen Participation API Routes ====
+
+  // Vote routes
+  app.get("/api/votes", async (req, res) => {
+    try {
+      const votes = await storage.getAllVotes();
+      res.json({ success: true, data: votes });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "투표 목록을 가져오는데 실패했습니다." });
+    }
+  });
+
+  app.get("/api/votes/hero", async (req, res) => {
+    try {
+      const vote = await storage.getHeroVote();
+      res.json({ success: true, data: vote });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "히어로 투표를 가져오는데 실패했습니다." });
+    }
+  });
+
+  app.post("/api/votes/:id/vote", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { type } = req.body; // 'agree' | 'disagree'
+
+      if (type !== 'agree' && type !== 'disagree') {
+        return res.status(400).json({ success: false, message: "올바른 투표 타입이 아닙니다." });
+      }
+
+      const vote = await storage.updateVoteCount(id, type);
+      res.json({ success: true, data: vote });
+    } catch (error) {
+      console.error("Error updating vote:", error);
+      res.status(500).json({ success: false, message: "투표 반영에 실패했습니다." });
+    }
+  });
+
+  // Suggestion routes
+  app.get("/api/suggestions", async (req, res) => {
+    try {
+      const suggestions = await storage.getAllSuggestions();
+      res.json({ success: true, data: suggestions });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "제안 목록을 가져오는데 실패했습니다." });
+    }
+  });
+
+  app.post("/api/suggestions", async (req, res) => {
+    try {
+      const data = insertSuggestionSchema.parse(req.body);
+      const suggestion = await storage.createSuggestion(data);
+      res.json({ success: true, data: suggestion });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ success: false, errors: error.errors });
+      } else {
+        res.status(500).json({ success: false, message: "제안 등록에 실패했습니다." });
+      }
+    }
+  });
+
+  // Board routes
+  app.get("/api/board", async (req, res) => {
+    try {
+      const { type } = req.query;
+      const items = await storage.getBoardItems(type as string);
+      res.json({ success: true, data: items });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "게시글 목록을 가져오는데 실패했습니다." });
+    }
+  });
+
+  app.post("/api/board", async (req, res) => {
+    try {
+      const data = insertBoardSchema.parse(req.body);
+      const item = await storage.createBoardItem(data);
+      res.json({ success: true, data: item });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ success: false, errors: error.errors });
+      } else {
+        res.status(500).json({ success: false, message: "게시글 등록에 실패했습니다." });
+      }
+    }
+  });
+
+  app.get("/api/board/:id", async (req, res) => {
+    try {
+      const item = await storage.getBoardItem(req.params.id);
+      if (!item) return res.status(404).json({ success: false, message: "게시글을 찾을 수 없습니다." });
+      res.json({ success: true, data: item });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "게시글을 가져오는데 실패했습니다." });
+    }
+  });
+
+  // Promise routes
+  app.get("/api/promises", async (req, res) => {
+    try {
+      const promises = await storage.getAllPromises();
+      res.json({ success: true, data: promises });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "공약 목록을 가져오는데 실패했습니다." });
+    }
+  });
+
+  // Comment routes
+  app.get("/api/comments/:targetType/:targetId", async (req, res) => {
+    try {
+      const { targetType, targetId } = req.params;
+      const comments = await storage.getComments(targetType, targetId);
+      res.json({ success: true, data: comments });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "댓글 목록을 가져오는데 실패했습니다." });
+    }
+  });
+
+  app.post("/api/comments", async (req, res) => {
+    try {
+      const data = insertCommentSchema.parse(req.body);
+      const comment = await storage.createComment(data);
+      res.json({ success: true, data: comment });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ success: false, errors: error.errors });
+      } else {
+        res.status(500).json({ success: false, message: "댓글 등록에 실패했습니다." });
+      }
     }
   });
 

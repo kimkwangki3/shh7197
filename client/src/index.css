@@ -4,27 +4,58 @@
 
 /* LIGHT MODE */
 :root {
-  --button-outline: rgba(0,0,0, .10);
-  --badge-outline: rgba(0,0,0, .05);
+  --button-outline: rgba(0, 0, 0, .10);
+  --badge-outline: rgba(0, 0, 0, .05);
 
   /* Automatic computation of border around primary / danger buttons */
-  --opaque-button-border-intensity: -8; /* In terms of percentages */
+  --opaque-button-border-intensity: -8;
+  /* In terms of percentages */
 
   /* Backgrounds applied on top of other backgrounds when hovered/active */
-  --elevate-1: rgba(0,0,0, .03);
-  --elevate-2: rgba(0,0,0, .08);
+  --elevate-1: rgba(0, 0, 0, .03);
+  --elevate-2: rgba(0, 0, 0, .08);
 
-  --background: 0 0% 96%;
+  /* Citizen Platform Theme - New Professional Blue Palette */
+  --primary: 214 100% 30%;
+  /* #004098 Primary Blue */
+  --primary-foreground: 0 0% 100%;
 
-  --foreground: 0 0% 9%;
+  --secondary: 220 14% 96%;
+  /* #F7F9FC Light Gray Background */
+  --secondary-foreground: 215 30% 12%;
+  /* #06275E Deep Navy Text */
 
-  --border: 0 0% 85%;
+  --accent: 207 100% 41%;
+  /* #0073CF Bright Point Blue */
+  --accent-foreground: 0 0% 100%;
+
+  --background: 210 20% 98%;
+  --foreground: 215 30% 12%;
 
   --card: 0 0% 100%;
+  --card-foreground: 217 30% 17%;
+  --card-border: 210 20% 90%;
 
-  --card-foreground: 0 0% 9%;
+  --muted: 214 15% 91%;
+  --muted-foreground: 215 14% 48%;
+  /* #6B7A8D Medium Gray */
 
-  --card-border: 0 0% 90%;
+  --destructive: 0 78% 59%;
+  /* #E84545 Soft Red */
+  --destructive-foreground: 0 0% 98%;
+
+  --border: 214 15% 89%;
+  --input: 214 15% 89%;
+  --ring: 214 100% 30%;
+
+  --font-sans: 'Noto Sans KR', 'Inter', sans-serif;
+  --radius: 1rem;
+  /* 16px per storyboard */
+  --shadow-2xs: 0px 2px 0px 0px hsl(220 15% 85% / 0.00);
+  --shadow-xs: 0px 2px 0px 0px hsl(220 15% 85% / 0.00);
+  --shadow-sm: 0px 2px 0px 0px hsl(220 15% 85% / 0.00), 0px 1px 2px -1px hsl(220 15% 85% / 0.00);
+  --shadow: 0px 2px 0px 0px hsl(220 15% 85% / 0.00), 0px 1px 2px -1px hsl(220 15% 85% / 0.00);
+  --shadow-md: 0px 2px 0px 0px hsl(220 15% 85% / 0.00), 0px 2px 4px -1px hsl(220 15% 85% / 0.00);
 
   --sidebar: 0 0% 98%;
 
@@ -48,43 +79,14 @@
 
   --popover-border: 0 0% 88%;
 
-  --primary: 0 0% 9%;
-
-  --primary-foreground: 0 0% 100%;
-
-  --secondary: 0 0% 85%;
-
-  --secondary-foreground: 0 0% 9%;
-
-  --muted: 0 0% 94%;
-
-  --muted-foreground: 0 0% 45%;
-
-  --accent: 0 0% 20%;
-
-  --accent-foreground: 0 0% 100%;
-
-  --destructive: 0 85% 30%;
-
-  --destructive-foreground: 0 0% 98%;
-
-  --input: 220 30% 75%;
-  --ring: 220 85% 20%;
   --chart-1: 220 85% 20%;
   --chart-2: 45 90% 65%;
   --chart-3: 220 40% 85%;
   --chart-4: 200 70% 25%;
   --chart-5: 40 95% 55%;
 
-  --font-sans: 'Inter', 'Noto Sans KR', sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: Menlo, monospace;
-  --radius: .5rem; /* 8px */
-  --shadow-2xs: 0px 2px 0px 0px hsl(220 15% 85% / 0.00);
-  --shadow-xs: 0px 2px 0px 0px hsl(220 15% 85% / 0.00);
-  --shadow-sm: 0px 2px 0px 0px hsl(220 15% 85% / 0.00), 0px 1px 2px -1px hsl(220 15% 85% / 0.00);
-  --shadow: 0px 2px 0px 0px hsl(220 15% 85% / 0.00), 0px 1px 2px -1px hsl(220 15% 85% / 0.00);
-  --shadow-md: 0px 2px 0px 0px hsl(220 15% 85% / 0.00), 0px 2px 4px -1px hsl(220 15% 85% / 0.00);
   --shadow-lg: 0px 2px 0px 0px hsl(220 15% 85% / 0.00), 0px 4px 6px -1px hsl(220 15% 85% / 0.00);
   --shadow-xl: 0px 2px 0px 0px hsl(220 15% 85% / 0.00), 0px 8px 10px -1px hsl(220 15% 85% / 0.00);
   --shadow-2xl: 0px 2px 0px 0px hsl(220 15% 85% / 0.00);
@@ -123,14 +125,15 @@
 }
 
 .dark {
-  --button-outline: rgba(255,255,255, .10);
-  --badge-outline: rgba(255,255,255, .05);
+  --button-outline: rgba(255, 255, 255, .10);
+  --badge-outline: rgba(255, 255, 255, .05);
 
-  --opaque-button-border-intensity: 9;  /* In terms of percentages */
+  --opaque-button-border-intensity: 9;
+  /* In terms of percentages */
 
   /* Backgrounds applied on top of other backgrounds when hovered/active */
-  --elevate-1: rgba(255,255,255, .04);
-  --elevate-2: rgba(255,255,255, .09);
+  --elevate-1: rgba(255, 255, 255, .04);
+  --elevate-2: rgba(255, 255, 255, .09);
 
   --background: 220 25% 8%;
 
@@ -342,7 +345,7 @@
     cursor: pointer;
     border: none;
   }
-  
+
   .slider::-moz-range-thumb {
     width: 12px;
     height: 12px;

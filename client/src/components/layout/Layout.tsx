@@ -36,11 +36,14 @@ export default function Layout({ children }: LayoutProps) {
                 {/* Header */}
                 <header className="h-14 bg-primary px-4 flex items-center justify-between sticky top-0 z-50">
                     <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center overflow-hidden">
+                            <img src="/images/candidate.png" alt="Candidate" className="w-full h-full object-cover" />
+                        </div>
                         <h1 className="text-white font-bold text-lg">홍성훈</h1>
-                        <span className="text-white/80 text-xs hidden sm:inline">시민 참여 플랫폼</span>
+                        <span className="text-white/80 text-xs hidden sm:inline">신대지구 주민 참여 플랫폼</span>
                     </div>
                     <div className="flex items-center gap-3">
-                        {user ? (
+                        {user && (
                             <div className="flex items-center gap-3">
                                 {user.avatarUrl && (
                                     <img src={user.avatarUrl} alt={user.nickname} className="w-8 h-8 rounded-full border-2 border-white/20" />
@@ -56,8 +59,6 @@ export default function Layout({ children }: LayoutProps) {
                                     <LogOut className="w-5 h-5" />
                                 </button>
                             </div>
-                        ) : (
-                            <KakaoLogin />
                         )}
                         <button className="text-white p-2 hover:bg-white/10 rounded-full transition-colors">
                             <Menu className="w-6 h-6" />

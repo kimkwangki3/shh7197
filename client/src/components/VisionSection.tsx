@@ -25,34 +25,34 @@ export default function VisionSection() {
   const policyAreas: PolicyArea[] = [
     {
       icon: GraduationCap,
-      title: "교육 혁신",
-      description: "모든 아이들이 꿈을 키울 수 있는 교육 환경 조성",
+      title: "신대 교육 특화",
+      description: "신대지구 아이들이 꿈을 키울 수 있는 최상의 교육 인프라 조성",
       keyPoints: [
-        "공교육 품질 향상 및 사교육비 부담 경감",
-        "디지털 교육 인프라 확충",
-        "진로 맞춤형 교육과정 도입"
+        "명품 교육 환경 조성 및 과밀 학급 해소",
+        "디지털 인재 양성을 위한 교육 거점화",
+        "방과 후 프로그램 다변화 및 지원 확대"
       ],
       priority: "최우선"
     },
     {
       icon: Heart,
-      title: "복지 확대",
-      description: "생애 주기별 맞춤형 복지로 국민 삶의 질 향상",
+      title: "신대 생활 복지",
+      description: "주민 맞춤형 생활 밀착형 복지로 신대지구 삶의 질 향상",
       keyPoints: [
-        "건강보험 보장성 확대",
-        "돌봄 서비스 공공성 강화",
-        "청년 주거 지원 확대"
+        "주민 건강 증진 및 스포츠 인프라 확충",
+        "시니어 및 아이 돌봄 돌봄 거점 센터 강화",
+        "신대 주민 이동 편의 및 대중교통 개선"
       ],
       priority: "최우선"
     },
     {
       icon: Building2,
-      title: "경제 활성화",
-      description: "혁신과 포용이 조화된 지속 가능한 경제 성장",
+      title: "지역 경제 활성화",
+      description: "신대지구 상권 활력 제고와 지속 가능한 지역 경제 성장",
       keyPoints: [
-        "중소기업 및 스타트업 지원 확대",
-        "일자리 창출 및 근로환경 개선",
-        "지역 균형 발전 추진"
+        "소상공인 및 지역 상권 디지털 전환 지원",
+        "신대지구 특화 문화 거리 조성 지원",
+        "지역 화폐 연계 및 커뮤니티 경제 활성화"
       ],
       priority: "우선"
     }
@@ -71,7 +71,7 @@ export default function VisionSection() {
       <div className="mb-10 text-center">
         <h2 className="text-3xl font-extrabold text-slate-900 mb-4">정책 비전</h2>
         <p className="text-slate-500 leading-relaxed max-w-[280px] mx-auto">
-          국민과 함께 만들어가는 더 나은 미래를 위한 실천을 약속합니다.
+          신대지구와 함께 만들어가는 더 나은 미래를 위한 실천을 약속합니다.
         </p>
       </div>
 
@@ -88,10 +88,10 @@ export default function VisionSection() {
               <Target size={24} />
             </div>
             <h3 className="text-xl font-bold text-slate-900 mb-4">
-              "모든 국민이 행복한 포용 국가"
+              "신대지구의 내일을 여는 행복 프로젝트"
             </h3>
             <p className="text-sm text-slate-600 leading-relaxed font-normal">
-              차별과 격차 없는 사회, 지속 가능한 발전을 통해 모든 국민이 존중받는 나라를 만들겠습니다.
+              생활의 질을 높이고 교육과 문화가 살아 숨 쉬는, 신대지구 주민 모두가 자부심을 느끼는 명품 도시를 만들겠습니다.
             </p>
           </CardContent>
         </Card>

@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import {
@@ -19,20 +19,43 @@ import {
 import { z } from "zod";
 import path from "path";
 import fs from "fs";
+import { sql } from "drizzle-orm";
+import { db } from "./db";
 
 // Admin check middleware
-const isAdmin = (req: any, res: any, next: any) => {
-  // For now, since we're using a simplified auth with localStorage on frontend,
-  // we'll rely on the user ID passed or session.
-  // In a real app, this would check the authenticated session.
-  // For this implementation, we'll check a custom header or session if available.
-  if (req.session?.user?.isAdmin || req.user?.isAdmin) {
+const ADMIN_TOKEN = "shh7197-admin-valid-token";
+
+const isAdmin = (req: Request, res: Response, next: NextFunction) => {
+  const token = req.headers["x-admin-token"] as string;
+  if (token === ADMIN_TOKEN) {
     return next();
   }
-  res.status(403).json({ message: "Admin privileges required" });
+  console.warn(`Unauthorized admin access attempt. Token: ${token}`);
+  res.status(401).json({ success: false, message: "관리자 권한이 필요합니다." });
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  app.post("/api/admin/login", async (req: Request, res: Response) => {
+    const { username, password } = req.body;
+    if (username === "admin" && password === "dkfvkrh123") {
+      return res.json({ success: true, token: ADMIN_TOKEN, message: "관리자로 로그인되었습니다." });
+    }
+    res.status(401).json({ success: false, message: "아이디 또는 비밀번호가 올바르지 않습니다." });
+  });
+
+  app.post("/api/admin/logout", (req: Request, res: Response) => {
+    res.json({ success: true });
+  });
+
+  app.get("/api/admin/check", (req: Request, res: Response) => {
+    const token = req.headers["x-admin-token"];
+    if (token === ADMIN_TOKEN) {
+      return res.json({ isAdmin: true });
+    }
+    res.json({ isAdmin: false });
+  });
+
+
   app.post("/api/auth/kakao", async (req, res) => {
     try {
       const { id, nickname, avatarUrl } = req.body;
@@ -166,7 +189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const entryData = insertTimelineEntrySchema.parse(req.body);
       const entry = await storage.createTimelineEntry(entryData);
       res.json({ success: true, data: entry });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating timeline entry:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ success: false, message: "입력 데이터가 올바르지 않습니다.", errors: error.errors });
@@ -182,7 +205,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updateData = insertTimelineEntrySchema.partial().parse(req.body);
       const entry = await storage.updateTimelineEntry(id, updateData);
       res.json({ success: true, data: entry });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating timeline entry:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ success: false, message: "입력 데이터가 올바르지 않습니다.", errors: error.errors });
@@ -221,7 +244,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const areaData = insertPolicyAreaSchema.parse(req.body);
       const area = await storage.createPolicyArea(areaData);
       res.json({ success: true, data: area });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating policy area:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ success: false, message: "입력 데이터가 올바르지 않습니다.", errors: error.errors });
@@ -237,7 +260,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updateData = insertPolicyAreaSchema.partial().parse(req.body);
       const area = await storage.updatePolicyArea(id, updateData);
       res.json({ success: true, data: area });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating policy area:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ success: false, message: "입력 데이터가 올바르지 않습니다.", errors: error.errors });
@@ -276,7 +299,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const detailData = insertContactDetailSchema.parse(req.body);
       const detail = await storage.createContactDetail(detailData);
       res.json({ success: true, data: detail });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating contact detail:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ success: false, message: "입력 데이터가 올바르지 않습니다.", errors: error.errors });
@@ -292,7 +315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updateData = insertContactDetailSchema.partial().parse(req.body);
       const detail = await storage.updateContactDetail(id, updateData);
       res.json({ success: true, data: detail });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating contact detail:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ success: false, message: "입력 데이터가 올바르지 않습니다.", errors: error.errors });
@@ -331,7 +354,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const hourData = insertOfficeHourSchema.parse(req.body);
       const hour = await storage.createOfficeHour(hourData);
       res.json({ success: true, data: hour });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating office hour:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ success: false, message: "입력 데이터가 올바르지 않습니다.", errors: error.errors });
@@ -347,7 +370,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updateData = insertOfficeHourSchema.partial().parse(req.body);
       const hour = await storage.updateOfficeHour(id, updateData);
       res.json({ success: true, data: hour });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating office hour:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ success: false, message: "입력 데이터가 올바르지 않습니다.", errors: error.errors });
@@ -386,7 +409,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const linkData = insertSocialLinkSchema.parse(req.body);
       const link = await storage.createSocialLink(linkData);
       res.json({ success: true, data: link });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating social link:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ success: false, message: "입력 데이터가 올바르지 않습니다.", errors: error.errors });
@@ -402,7 +425,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updateData = insertSocialLinkSchema.partial().parse(req.body);
       const link = await storage.updateSocialLink(id, updateData);
       res.json({ success: true, data: link });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating social link:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ success: false, message: "입력 데이터가 올바르지 않습니다.", errors: error.errors });
@@ -441,7 +464,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const statData = insertStatisticSchema.parse(req.body);
       const stat = await storage.createStatistic(statData);
       res.json({ success: true, data: stat });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating statistic:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ success: false, message: "입력 데이터가 올바르지 않습니다.", errors: error.errors });
@@ -457,7 +480,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updateData = insertStatisticSchema.partial().parse(req.body);
       const stat = await storage.updateStatistic(id, updateData);
       res.json({ success: true, data: stat });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating statistic:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ success: false, message: "입력 데이터가 올바르지 않습니다.", errors: error.errors });
@@ -504,13 +527,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/votes/:id/vote", async (req, res) => {
     try {
       const { id } = req.params;
-      const { type } = req.body; // 'agree' | 'disagree'
+      const { indices } = req.body; // number[]
 
-      if (type !== 'agree' && type !== 'disagree') {
-        return res.status(400).json({ success: false, message: "올바른 투표 타입이 아닙니다." });
+      if (!Array.isArray(indices) || indices.length === 0) {
+        return res.status(400).json({ success: false, message: "올바른 투표 항목을 선택해주세요." });
       }
 
-      const vote = await storage.updateVoteCount(id, type);
+      const vote = await storage.updateVoteCount(id, indices);
       res.json({ success: true, data: vote });
     } catch (error) {
       console.error("Error updating vote:", error);
@@ -548,7 +571,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { type } = req.query;
       const items = await storage.getBoardItems(type as string);
       res.json({ success: true, data: items });
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ success: false, message: "게시글 목록을 가져오는데 실패했습니다." });
     }
   });
@@ -578,37 +601,161 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Promise routes
-  app.get("/api/promises", async (req, res) => {
+  app.get("/api/promises", async (req: Request, res: Response) => {
     try {
       const promises = await storage.getAllPromises();
       res.json({ success: true, data: promises });
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ success: false, message: "공약 목록을 가져오는데 실패했습니다." });
     }
   });
 
   // Comment routes
-  app.get("/api/comments/:targetType/:targetId", async (req, res) => {
+  app.get("/api/comments/:targetType/:targetId", async (req: Request, res: Response) => {
     try {
       const { targetType, targetId } = req.params;
-      const comments = await storage.getComments(targetType, targetId);
+      const comments = await storage.getComments(targetType as string, targetId as string);
       res.json({ success: true, data: comments });
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ success: false, message: "댓글 목록을 가져오는데 실패했습니다." });
     }
   });
 
-  app.post("/api/comments", async (req, res) => {
+  app.post("/api/comments", async (req: Request, res: Response) => {
     try {
       const data = insertCommentSchema.parse(req.body);
       const comment = await storage.createComment(data);
       res.json({ success: true, data: comment });
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         res.status(400).json({ success: false, errors: error.errors });
       } else {
         res.status(500).json({ success: false, message: "댓글 등록에 실패했습니다." });
       }
+    }
+  });
+
+  // ==== Admin CRUD API Routes ====
+
+  // Admin: 투표 생성
+  app.post("/api/admin/votes", isAdmin, async (req: Request, res: Response) => {
+    try {
+      const data = insertVoteSchema.parse(req.body);
+      const vote = await storage.createVote(data);
+      res.json({ success: true, data: vote });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ success: false, errors: error.errors });
+      } else {
+        res.status(500).json({ success: false, message: "투표 생성에 실패했습니다." });
+      }
+    }
+  });
+
+  // Admin: 투표 목록 조회
+  app.get("/api/admin/votes", isAdmin, async (req: Request, res: Response) => {
+    try {
+      const allVotes = await storage.getAllVotes();
+      res.json({ success: true, data: allVotes });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: "투표 목록 조회에 실패했습니다." });
+    }
+  });
+
+  // Admin: 투표 삭제
+  app.delete("/api/admin/votes/:id", isAdmin, async (req: Request, res: Response) => {
+    try {
+      await storage.deleteVote(req.params.id as string);
+      res.json({ success: true, message: "투표가 삭제되었습니다." });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "투표 삭제에 실패했습니다." });
+    }
+  });
+
+  // Admin: 의견 삭제
+  app.delete("/api/admin/suggestions/:id", isAdmin, async (req: Request, res: Response) => {
+    try {
+      await storage.deleteSuggestion(req.params.id as string);
+      res.json({ success: true, message: "의견이 삭제되었습니다." });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: "의견 삭제에 실패했습니다." });
+    }
+  });
+
+  // Admin: 의견에 답글 달기 (comment로 처리)
+  app.post("/api/admin/suggestions/:id/reply", isAdmin, async (req: Request, res: Response) => {
+    try {
+      const { content } = req.body;
+      if (!content) return res.status(400).json({ success: false, message: "답글 내용이 필요합니다." });
+      const comment = await storage.createComment({
+        targetType: "suggestion",
+        targetId: req.params.id as string,
+        content,
+        authorId: "admin",
+      });
+      res.json({ success: true, data: comment });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: "답글 등록에 실패했습니다." });
+    }
+  });
+
+  // Admin: 게시판 글 생성
+  app.post("/api/admin/board", isAdmin, async (req: Request, res: Response) => {
+    try {
+      const data = insertBoardSchema.parse(req.body);
+      const item = await storage.createBoardItem(data);
+      res.json({ success: true, data: item });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ success: false, errors: error.errors });
+      } else {
+        res.status(500).json({ success: false, message: "게시글 등록에 실패했습니다." });
+      }
+    }
+  });
+
+  // Admin: 게시판 글 삭제
+  app.delete("/api/admin/board/:id", isAdmin, async (req: Request, res: Response) => {
+    try {
+      await storage.deleteBoardItem(req.params.id as string);
+      res.json({ success: true, message: "게시글이 삭제되었습니다." });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: "게시글 삭제에 실패했습니다." });
+    }
+  });
+
+  // Admin: 공약 생성
+  app.post("/api/admin/promises", isAdmin, async (req: Request, res: Response) => {
+    try {
+      const data = insertPromiseSchema.parse(req.body);
+      const item = await storage.createPromise(data);
+      res.json({ success: true, data: item });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ success: false, errors: error.errors });
+      } else {
+        res.status(500).json({ success: false, message: "공약 등록에 실패했습니다." });
+      }
+    }
+  });
+
+  // Admin: 공약 삭제
+  app.delete("/api/admin/promises/:id", isAdmin, async (req: Request, res: Response) => {
+    try {
+      await storage.deletePromise(req.params.id as string);
+      res.json({ success: true, message: "공약이 삭제되었습니다." });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: "공약 삭제에 실패했습니다." });
+    }
+  });
+
+  // Admin: 댓글 삭제
+  app.delete("/api/admin/comments/:id", isAdmin, async (req: Request, res: Response) => {
+    try {
+      await storage.deleteComment(req.params.id as string);
+      res.json({ success: true, message: "댓글이 삭제되었습니다." });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: "댓글 삭제에 실패했습니다." });
     }
   });
 

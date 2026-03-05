@@ -1,3 +1,4 @@
+import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Vote, Suggestion, Board } from "@shared/schema";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,22 +15,28 @@ export default function Home() {
   const [, setLocation] = useLocation();
   const { checkAuthOrLogin } = useAuth();
   const { toast } = useToast();
-  const { data: heroVote, isLoading: heroLoading } = useQuery<{ success: boolean; data: Vote }>({
-    queryKey: ["/api/votes/hero"],
+  const { data: votesData, isLoading: votesLoading } = useQuery<{ success: boolean; data: Vote[] }>({
+    queryKey: ["/api/votes"],
   });
 
   const { data: suggestions, isLoading: suggestionsLoading } = useQuery<{ success: boolean; data: Suggestion[] }>({
     queryKey: ["/api/suggestions"],
   });
 
+  const ongoingVotes = React.useMemo(() => {
+    if (!votesData?.data) return [];
+    const now = new Date();
+    return votesData.data.filter(v => new Date(v.endDate) > now).slice(0, 3);
+  }, [votesData?.data]);
+
   return (
     <div className="flex flex-col gap-6 p-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
-      {/* Hero Section - Hot Vote */}
+      {/* Ongoing Votes Section */}
       <section>
         <div className="flex items-center justify-between mb-3 px-1">
           <h2 className="text-lg font-bold flex items-center gap-2">
-            <span className="text-xl">🔥</span> 지금 뜨거운 투표
+            <span className="text-xl">🔥</span> 지금 진행중인 투표
           </h2>
           <Button
             variant="ghost"
@@ -41,48 +48,47 @@ export default function Home() {
           </Button>
         </div>
 
-        {heroLoading ? (
-          <Skeleton className="h-48 w-full rounded-2xl" />
-        ) : heroVote?.data ? (
-          <Card className="bg-gradient-to-br from-[#1A6FD4] to-[#0D4C9A] border-none text-white overflow-hidden rounded-2xl shadow-blue-200 shadow-lg">
-            <CardContent className="p-5 flex flex-col gap-4">
-              <div className="flex justify-between items-start">
-                <Badge variant="secondary" className="bg-white/20 text-white border-none hover:bg-white/30">
-                  {heroVote.data.category}
-                </Badge>
-                <div className="flex items-center gap-1.5 text-white/80 text-xs">
-                  <Clock className="w-3 h-3" /> D-14
-                </div>
-              </div>
-
-              <h3 className="text-xl font-bold leading-tight">
-                "{heroVote.data.title}"
-              </h3>
-
-              <div className="flex items-center gap-3 text-sm text-white/90">
-                <div className="flex items-center gap-1">
-                  <Users className="w-4 h-4" /> {heroVote.data.agreeCount + heroVote.data.disagreeCount}명 참여중
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 mt-2">
-                <Button
-                  onClick={() => checkAuthOrLogin(() => toast({ title: "투표가 완료되었습니다." }))}
-                  className="bg-white text-primary hover:bg-white/90 font-bold rounded-xl h-12"
+        {votesLoading ? (
+          <div className="flex flex-col gap-3">
+            {[1, 2].map(i => <Skeleton key={i} className="h-32 w-full rounded-[24px]" />)}
+          </div>
+        ) : ongoingVotes.length > 0 ? (
+          <div className="flex flex-col gap-3">
+            {ongoingVotes.map((vote) => {
+              const total = (vote.results || []).reduce((acc: number, curr: number) => acc + curr, 0);
+              return (
+                <div
+                  key={vote.id}
+                  onClick={() => setLocation(`/votes?id=${vote.id}`)}
+                  className="group bg-white rounded-[24px] shadow-sm border border-slate-100 overflow-hidden cursor-pointer hover:shadow-md transition-all active:scale-[0.98]"
                 >
-                  O 찬성
-                </Button>
-                <Button
-                  onClick={() => checkAuthOrLogin(() => toast({ title: "투표가 완료되었습니다." }))}
-                  className="bg-slate-200 text-slate-600 hover:bg-slate-300 border-none font-bold rounded-xl h-12"
-                >
-                  X 반대
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                  <div className="p-5 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center flex-shrink-0 group-hover:bg-primary transition-colors">
+                      <Plus className="w-6 h-6 text-primary group-hover:text-white transition-colors" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Badge className="bg-primary/10 text-primary border-none text-[9px] font-black px-1.5 py-0.5">진행중</Badge>
+                        <span className="text-[10px] text-slate-400 font-bold">D-{Math.max(0, Math.ceil((new Date(vote.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))}</span>
+                      </div>
+                      <h3 className="text-[15px] font-black text-slate-800 truncate leading-tight group-hover:text-primary transition-colors">
+                        {vote.title}
+                      </h3>
+                      <div className="flex items-center gap-3 mt-1.5 text-[11px] text-slate-400 font-bold">
+                        <div className="flex items-center gap-1">
+                          <Users className="w-3 h-3" />
+                          <span>{total.toLocaleString()}명 참여</span>
+                        </div>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-slate-200 group-hover:text-primary transition-colors" />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         ) : (
-          <Card className="bg-muted/50 border-dashed rounded-2xl h-48 flex items-center justify-center">
+          <Card className="bg-muted/50 border-dashed rounded-2xl h-32 flex items-center justify-center">
             <p className="text-muted-foreground text-sm">진행 중인 투표가 없습니다.</p>
           </Card>
         )}

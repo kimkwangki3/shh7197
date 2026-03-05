@@ -1,270 +1,759 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Vote, Suggestion, Board, PromiseItem } from "@shared/schema";
-import { apiRequest } from "@/lib/queryClient";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import type { Vote, Suggestion, Board, PromiseItem, Comment } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import {
-    BarChart3,
-    MessageSquare,
-    ClipboardList,
-    BookOpen,
-    Plus,
-    Trash2,
-    Edit,
-    ExternalLink,
-    Loader2
+    BarChart3, MessageSquare, ClipboardList, BookOpen,
+    Plus, Trash2, ExternalLink, Loader2, LogOut, RefreshCcw,
+    Users, ShieldCheck, Send, X, ImageIcon
 } from "lucide-react";
 import { Link } from "wouter";
+import AdminLogin, { ADMIN_TOKEN_KEY } from "@/components/admin/AdminLogin";
 
-export default function Admin() {
+// ─── 인증 헬퍼 ──────────────────────────────────────────────────
+function getToken() {
+    return localStorage.getItem(ADMIN_TOKEN_KEY) || "";
+}
+
+async function adminFetch(method: string, url: string, data?: unknown) {
+    const headers: Record<string, string> = { "x-admin-token": getToken() };
+    if (data) headers["Content-Type"] = "application/json";
+    const res = await fetch(url, {
+        method,
+        headers,
+        body: data ? JSON.stringify(data) : undefined,
+    });
+    if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+    return res.json();
+}
+
+async function publicFetch(url: string) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`${res.status}`);
+    return res.json();
+}
+
+// ─── 투표 생성 폼 ─────────────────────────────────────────────
+function VoteCreateForm({ onClose }: { onClose: () => void }) {
     const { toast } = useToast();
     const queryClient = useQueryClient();
-    const [activeTab, setActiveTab] = useState("votes");
 
-    // Queries
-    const { data: votes, isLoading: votesLoading } = useQuery<Vote[]>({ queryKey: ["/api/admin/votes"] });
-    const { data: suggestions, isLoading: suggestionsLoading } = useQuery<Suggestion[]>({ queryKey: ["/api/suggestions"] });
-    const { data: boards, isLoading: boardsLoading } = useQuery<Board[]>({ queryKey: ["/api/board"] });
-    const { data: promises, isLoading: promisesLoading } = useQuery<PromiseItem[]>({ queryKey: ["/api/promises"] });
+    // 기본 날짜를 오늘 자정으로 설정
+    const today = new Date();
+    today.setHours(23, 59, 0, 0);
+    const defaultDateStr = today.toISOString().slice(0, 16);
 
-    // Mutations
-    const deleteVote = useMutation({
-        mutationFn: (id: string) => apiRequest("DELETE", `/api/admin/votes/${id}`),
+    const [form, setForm] = useState({
+        title: "", description: "", category: "정책",
+        endDate: defaultDateStr, isHero: false, durationDays: "1",
+        options: ["", ""], // 최소 2개 항목
+        allowMultiple: false
+    });
+
+    const createVote = useMutation({
+        mutationFn: (data: unknown) => adminFetch("POST", "/api/admin/votes", data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["/api/admin/votes"] });
-            toast({ title: "삭제 완료", description: "투표가 성공적으로 삭제되었습니다." });
-        }
+            toast({ title: "✅ 투표 생성 완료", description: "새로운 투표가 등록되었습니다." });
+            onClose();
+        },
+        onError: () => toast({ title: "❌ 오류", description: "투표 생성에 실패했습니다.", variant: "destructive" })
     });
 
-    const deleteSuggestion = useMutation({
-        mutationFn: (id: string) => apiRequest("DELETE", `/api/admin/suggestions/${id}`),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["/api/suggestions"] });
-            toast({ title: "삭제 완료", description: "의견이 성공적으로 삭제되었습니다." });
+    // 기간 선택 시 날짜 자동 계산
+    useEffect(() => {
+        const days = parseInt(form.durationDays);
+        if (!isNaN(days)) {
+            const newDate = new Date();
+            newDate.setDate(newDate.getDate() + days);
+            newDate.setHours(23, 59, 0, 0);
+            setForm(f => ({ ...f, endDate: newDate.toISOString().slice(0, 16) }));
         }
-    });
+    }, [form.durationDays]);
 
-    if (votesLoading || suggestionsLoading || boardsLoading || promisesLoading) {
-        return (
-            <div className="flex items-center justify-center min-h-screen">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            </div>
-        );
-    }
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const filteredOptions = form.options.filter(opt => opt.trim() !== "");
+
+        if (!form.title || !form.endDate) return toast({ title: "입력 오류", description: "제목과 마감일을 입력해주세요.", variant: "destructive" });
+        if (filteredOptions.length < 2) return toast({ title: "입력 오류", description: "투표 항목을 최소 2개 이상 입력해주세요.", variant: "destructive" });
+
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { durationDays, ...submitData } = form;
+        createVote.mutate({
+            ...submitData,
+            options: filteredOptions,
+            endDate: new Date(form.endDate).toISOString()
+        });
+    };
+
+    const updateOption = (index: number, value: string) => {
+        const newOptions = [...form.options];
+        newOptions[index] = value;
+        setForm(f => ({ ...f, options: newOptions }));
+    };
+
+    const addOption = () => {
+        setForm(f => ({ ...f, options: [...f.options, ""] }));
+    };
+
+    const removeOption = (index: number) => {
+        if (form.options.length <= 2) return;
+        const newOptions = form.options.filter((_, i) => i !== index);
+        setForm(f => ({ ...f, options: newOptions }));
+    };
 
     return (
-        <div className="container mx-auto px-4 py-8 max-w-[1200px]">
-            <div className="flex justify-between items-center mb-8">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900">관리자 대시보드</h1>
-                    <p className="text-slate-500 mt-1">플랫폼의 모든 콘텐츠를 관리합니다.</p>
-                </div>
-                <Link href="/">
-                    <Button variant="outline" className="gap-2">
-                        <ExternalLink className="w-4 h-4" />
-                        사이트 바로가기
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-blue-800 flex items-center gap-2"><Plus className="w-4 h-4" /> 신규 투표 생성</h3>
+                <Button variant="ghost" size="sm" onClick={onClose}><X className="w-4 h-4" /></Button>
+            </div>
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Input placeholder="투표 제목" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} className="col-span-full" />
+                <Textarea placeholder="투표 설명" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="col-span-full min-h-[80px]" />
+
+                <div className="col-span-full space-y-2">
+                    <label className="text-xs font-medium text-slate-500 ml-1">투표 항목</label>
+                    {form.options.map((option, idx) => (
+                        <div key={idx} className="flex gap-2">
+                            <Input
+                                placeholder={`항목 ${idx + 1}`}
+                                value={option}
+                                onChange={e => updateOption(idx, e.target.value)}
+                            />
+                            {form.options.length > 2 && (
+                                <Button type="button" variant="ghost" size="sm" onClick={() => removeOption(idx)}>
+                                    <Trash2 className="w-4 h-4 text-red-400" />
+                                </Button>
+                            )}
+                        </div>
+                    ))}
+                    <Button type="button" variant="outline" size="sm" onClick={addOption} className="w-full border-dashed border-blue-300 text-blue-600 bg-white">
+                        + 항목 추가
                     </Button>
-                </Link>
-            </div>
+                </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <StatCard title="총 투표" value={votes?.length || 0} icon={BarChart3} color="text-blue-600" />
-                <StatCard title="총 의견" value={suggestions?.length || 0} icon={MessageSquare} color="text-indigo-600" />
-                <StatCard title="총 게시물" value={boards?.length || 0} icon={ClipboardList} color="text-slate-600" />
-                <StatCard title="진행중 공약" value={promises?.filter(p => p.status === "진행중").length || 0} icon={BookOpen} color="text-emerald-600" />
-            </div>
-
-            <Tabs defaultValue="votes" className="space-y-6" onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-4 lg:w-[600px]">
-                    <TabsTrigger value="votes">투표 관리</TabsTrigger>
-                    <TabsTrigger value="suggestions">의견 관리</TabsTrigger>
-                    <TabsTrigger value="board">게시판 관리</TabsTrigger>
-                    <TabsTrigger value="promises">공약 관리</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="votes">
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                            <div>
-                                <CardTitle>투표 목록</CardTitle>
-                                <CardDescription>진행 중이거나 종료된 투표를 관리합니다.</CardDescription>
-                            </div>
-                            <Button size="sm" className="gap-2">
-                                <Plus className="w-4 h-4" /> 투표 생성
-                            </Button>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="relative w-full overflow-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b bg-slate-50/50">
-                                            <th className="h-10 px-4 text-left font-medium text-slate-500">제목</th>
-                                            <th className="h-10 px-4 text-left font-medium text-slate-500">카테고리</th>
-                                            <th className="h-10 px-4 text-center font-medium text-slate-500">참여수</th>
-                                            <th className="h-10 px-4 text-center font-medium text-slate-500">상태</th>
-                                            <th className="h-10 px-4 text-right font-medium text-slate-500">관리</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {votes?.map((vote) => (
-                                            <tr key={vote.id} className="border-b transition-colors hover:bg-slate-50/50">
-                                                <td className="p-4 align-middle font-medium">{vote.title}</td>
-                                                <td className="p-4 align-middle text-slate-600">{vote.category}</td>
-                                                <td className="p-4 align-middle text-center">{vote.agreeCount + vote.disagreeCount}</td>
-                                                <td className="p-4 align-middle text-center">
-                                                    <Badge variant={vote.isHero ? "default" : "secondary"}>
-                                                        {vote.isHero ? "메인" : "일반"}
-                                                    </Badge>
-                                                </td>
-                                                <td className="p-4 align-middle text-right">
-                                                    <div className="flex justify-end gap-2">
-                                                        <Button variant="ghost" size="icon"><Edit className="w-4 h-4" /></Button>
-                                                        <Button variant="ghost" size="icon" className="text-red-600" onClick={() => deleteVote.mutate(vote.id)}><Trash2 className="w-4 h-4" /></Button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
-                <TabsContent value="suggestions">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>시민 의견 목록</CardTitle>
-                            <CardDescription>시민들이 남긴 의견과 제안을 검토하고 관리합니다.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-4">
-                                {suggestions?.map((s) => (
-                                    <div key={s.id} className="flex items-start justify-between p-4 border rounded-lg hover:border-slate-300 transition-colors">
-                                        <div>
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <Badge variant="outline">{s.category}</Badge>
-                                                <span className="text-xs text-slate-400">{new Date(s.createdAt).toLocaleDateString()}</span>
-                                            </div>
-                                            <h4 className="font-semibold text-slate-900">{s.title}</h4>
-                                            <p className="text-sm text-slate-600 mt-1 line-clamp-2">{s.content}</p>
-                                        </div>
-                                        <Button variant="ghost" size="icon" className="text-red-500" onClick={() => deleteSuggestion.mutate(s.id)}>
-                                            <Trash2 className="w-4 h-4" />
-                                        </Button>
-                                    </div>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
-                <TabsContent value="board">
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                            <div>
-                                <CardTitle>게시물 관리</CardTitle>
-                                <CardDescription>공지사항 및 자유 게시판을 관리합니다.</CardDescription>
-                            </div>
-                            <Button size="sm" className="gap-2">
-                                <Plus className="w-4 h-4" /> 게시물 작성
-                            </Button>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="relative w-full overflow-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b bg-slate-50/50">
-                                            <th className="h-10 px-4 text-left font-medium text-slate-500">제목</th>
-                                            <th className="h-10 px-4 text-left font-medium text-slate-500">구분</th>
-                                            <th className="h-10 px-4 text-center font-medium text-slate-500">조회수</th>
-                                            <th className="h-10 px-4 text-right font-medium text-slate-500">관리</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {boards?.map((item) => (
-                                            <tr key={item.id} className="border-b transition-colors hover:bg-slate-50/50">
-                                                <td className="p-4 align-middle">
-                                                    <div className="flex items-center gap-2">
-                                                        {item.isPinned && <Badge className="bg-amber-500">공지</Badge>}
-                                                        {item.title}
-                                                    </div>
-                                                </td>
-                                                <td className="p-4 align-middle text-slate-600">{item.type}</td>
-                                                <td className="p-4 align-middle text-center">{item.viewCount}</td>
-                                                <td className="p-4 align-middle text-right">
-                                                    <div className="flex justify-end gap-2">
-                                                        <Button variant="ghost" size="icon"><Edit className="w-4 h-4" /></Button>
-                                                        <Button variant="ghost" size="icon" className="text-red-600"><Trash2 className="w-4 h-4" /></Button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
-                <TabsContent value="promises">
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                            <div>
-                                <CardTitle>공약 관리</CardTitle>
-                                <CardDescription>분야별 공약과 진행 상태를 관리합니다.</CardDescription>
-                            </div>
-                            <Button size="sm" className="gap-2">
-                                <Plus className="w-4 h-4" /> 공약 추가
-                            </Button>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {promises?.map((promise) => (
-                                    <div key={promise.id} className="p-4 border rounded-lg flex justify-between items-center">
-                                        <div>
-                                            <div className="text-xs text-slate-400 mb-1">{promise.category}</div>
-                                            <div className="font-semibold">{promise.title}</div>
-                                            <div className="flex items-center gap-2 mt-2">
-                                                <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                                    <div className="h-full bg-emerald-500" style={{ width: `${promise.progress}%` }} />
-                                                </div>
-                                                <span className="text-xs font-medium">{promise.progress}%</span>
-                                                <Badge variant="outline" className="text-[10px] h-4">{promise.status}</Badge>
-                                            </div>
-                                        </div>
-                                        <div className="flex gap-1">
-                                            <Button variant="ghost" size="icon"><Edit className="w-4 h-4 text-slate-400" /></Button>
-                                            <Button variant="ghost" size="icon"><Trash2 className="w-4 h-4 text-red-400" /></Button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-            </Tabs>
+                <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-slate-500 ml-1">카테고리</label>
+                    <select className="border rounded-lg px-3 py-2 text-sm bg-white" value={form.category} onChange={e => setForm((f: any) => ({ ...f, category: e.target.value }))}>
+                        {["정책", "교통", "복지", "환경", "교육", "안전", "기타"].map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-slate-500 ml-1">투표 기간 (일)</label>
+                    <select className="border rounded-lg px-3 py-2 text-sm bg-white" value={form.durationDays} onChange={e => setForm(f => ({ ...f, durationDays: e.target.value }))}>
+                        {[1, 2, 3, 4, 5].map(d => <option key={d} value={d}>{d}일 동안 진행</option>)}
+                    </select>
+                </div>
+                <div className="col-span-full flex flex-col gap-1">
+                    <label className="text-xs font-medium text-slate-500 ml-1">마감 일시</label>
+                    <Input type="datetime-local" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} className="text-sm" />
+                </div>
+                <div className="col-span-full flex gap-4 mt-1">
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input type="checkbox" checked={form.isHero} onChange={e => setForm(f => ({ ...f, isHero: e.target.checked }))} className="w-4 h-4 rounded border-blue-300 text-blue-600 focus:ring-blue-500" />
+                        <span className="font-medium text-slate-700">히어로 투표로 지정</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input type="checkbox" checked={form.allowMultiple} onChange={e => setForm(f => ({ ...f, allowMultiple: e.target.checked }))} className="w-4 h-4 rounded border-blue-300 text-blue-600 focus:ring-blue-500" />
+                        <span className="font-medium text-slate-700">복수 선택 허용</span>
+                    </label>
+                </div>
+                <div className="col-span-full flex gap-2 justify-end">
+                    <Button type="button" variant="outline" onClick={onClose}>취소</Button>
+                    <Button type="submit" disabled={createVote.isPending} className="bg-blue-600 hover:bg-blue-700 text-white min-w-[100px]">
+                        {createVote.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "투표 등록"}
+                    </Button>
+                </div>
+            </form>
         </div>
     );
 }
 
-function StatCard({ title, value, icon: Icon, color }: any) {
+
+// ─── 게시판 글 생성 폼 ────────────────────────────────────────
+function BoardCreateForm({ onClose }: { onClose: () => void }) {
+    const { toast } = useToast();
+    const queryClient = useQueryClient();
+    const [form, setForm] = useState({ type: "notice", title: "", content: "", imageUrl: "", isPinned: false });
+
+    const createBoard = useMutation({
+        mutationFn: (data: unknown) => adminFetch("POST", "/api/admin/board", data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["/api/board"] });
+            toast({ title: "✅ 게시글 등록 완료" });
+            onClose();
+        },
+        onError: () => toast({ title: "❌ 오류", description: "게시글 등록 실패", variant: "destructive" })
+    });
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!form.title || !form.content) return toast({ title: "입력 오류", description: "제목과 내용을 입력해주세요.", variant: "destructive" });
+        createBoard.mutate(form);
+    };
+
     return (
-        <Card>
-            <CardContent className="flex items-center gap-4 p-6">
-                <div className={`p-3 rounded-xl bg-slate-50 ${color}`}>
-                    <Icon className="w-6 h-6" />
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-amber-800 flex items-center gap-2"><Plus className="w-4 h-4" /> 게시글 작성</h3>
+                <Button variant="ghost" size="sm" onClick={onClose}><X className="w-4 h-4" /></Button>
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                    <select className="border rounded-lg px-3 py-2 text-sm" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
+                        <option value="notice">공지사항</option>
+                        <option value="policy">정책소식</option>
+                        <option value="free">자유게시판</option>
+                    </select>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input type="checkbox" checked={form.isPinned} onChange={e => setForm(f => ({ ...f, isPinned: e.target.checked }))} />
+                        상단 고정
+                    </label>
                 </div>
+                <Input placeholder="제목" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
+                <Textarea placeholder="내용" value={form.content} onChange={e => setForm(f => ({ ...f, content: e.target.value }))} className="min-h-[120px]" />
+                <div className="flex items-center gap-2">
+                    <ImageIcon className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                    <Input placeholder="이미지 URL (선택사항)" value={form.imageUrl} onChange={e => setForm(f => ({ ...f, imageUrl: e.target.value }))} />
+                </div>
+                {form.imageUrl && <img src={form.imageUrl} alt="미리보기" className="h-32 object-cover rounded-lg" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />}
+                <div className="flex gap-2 justify-end">
+                    <Button type="button" variant="outline" onClick={onClose}>취소</Button>
+                    <Button type="submit" disabled={createBoard.isPending} className="bg-amber-600 hover:bg-amber-700 text-white">
+                        {createBoard.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "게시글 등록"}
+                    </Button>
+                </div>
+            </form>
+        </div>
+    );
+}
+
+// ─── 공약 생성 폼 ─────────────────────────────────────────────
+function PromiseCreateForm({ onClose }: { onClose: () => void }) {
+    const { toast } = useToast();
+    const queryClient = useQueryClient();
+    const [form, setForm] = useState({
+        category: "교통", title: "", description: "",
+        status: "계획중", progress: 0, imageUrl: "", keyPoints: [""]
+    });
+
+    const createPromise = useMutation({
+        mutationFn: (data: unknown) => adminFetch("POST", "/api/admin/promises", data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["/api/promises"] });
+            toast({ title: "✅ 공약 등록 완료" });
+            onClose();
+        },
+        onError: () => toast({ title: "❌ 오류", description: "공약 등록 실패", variant: "destructive" })
+    });
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!form.title || !form.description) return toast({ title: "입력 오류", variant: "destructive" });
+        createPromise.mutate({ ...form, keyPoints: form.keyPoints.filter(k => k.trim()) });
+    };
+
+    return (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-emerald-800 flex items-center gap-2"><Plus className="w-4 h-4" /> 공약 등록</h3>
+                <Button variant="ghost" size="sm" onClick={onClose}><X className="w-4 h-4" /></Button>
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                    <select className="border rounded-lg px-3 py-2 text-sm" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+                        {["교통", "복지", "환경", "교육", "안전", "경제", "문화", "기타"].map(c => <option key={c}>{c}</option>)}
+                    </select>
+                    <select className="border rounded-lg px-3 py-2 text-sm" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
+                        <option value="계획중">계획중</option>
+                        <option value="진행중">진행중</option>
+                        <option value="이행완료">이행완료</option>
+                    </select>
+                </div>
+                <Input placeholder="공약 제목" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
+                <Textarea placeholder="공약 설명" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="min-h-[100px]" />
+                <div className="flex items-center gap-3">
+                    <label className="text-sm text-slate-600 whitespace-nowrap">진행률 {form.progress}%</label>
+                    <input type="range" min={0} max={100} value={form.progress} onChange={e => setForm(f => ({ ...f, progress: Number(e.target.value) }))} className="flex-1" />
+                </div>
+                <div className="flex items-center gap-2">
+                    <ImageIcon className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                    <Input placeholder="이미지 URL (선택사항)" value={form.imageUrl} onChange={e => setForm(f => ({ ...f, imageUrl: e.target.value }))} />
+                </div>
+                {form.imageUrl && <img src={form.imageUrl} alt="미리보기" className="h-32 object-cover rounded-lg" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />}
                 <div>
-                    <p className="text-sm font-medium text-slate-500">{title}</p>
-                    <h3 className="text-2xl font-bold">{value}</h3>
+                    <p className="text-sm font-medium text-slate-600 mb-2">핵심 포인트</p>
+                    {form.keyPoints.map((kp, i) => (
+                        <div key={i} className="flex gap-2 mb-2">
+                            <Input
+                                placeholder={`포인트 ${i + 1}`}
+                                value={kp}
+                                onChange={e => setForm(f => {
+                                    const kps = [...f.keyPoints];
+                                    kps[i] = e.target.value;
+                                    return { ...f, keyPoints: kps };
+                                })}
+                            />
+                            {form.keyPoints.length > 1 && (
+                                <Button type="button" variant="ghost" size="sm" onClick={() => setForm(f => ({ ...f, keyPoints: f.keyPoints.filter((_, j) => j !== i) }))}>
+                                    <X className="w-3 h-3" />
+                                </Button>
+                            )}
+                        </div>
+                    ))}
+                    <Button type="button" variant="outline" size="sm" onClick={() => setForm(f => ({ ...f, keyPoints: [...f.keyPoints, ""] }))}>
+                        + 포인트 추가
+                    </Button>
                 </div>
-            </CardContent>
-        </Card>
+                <div className="flex gap-2 justify-end">
+                    <Button type="button" variant="outline" onClick={onClose}>취소</Button>
+                    <Button type="submit" disabled={createPromise.isPending} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                        {createPromise.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "공약 등록"}
+                    </Button>
+                </div>
+            </form>
+        </div>
+    );
+}
+
+// ─── 의견 행 (답글 포함) ──────────────────────────────────────
+function SuggestionRow({ suggestion, onDelete }: { suggestion: Suggestion, onDelete: (id: string) => void }) {
+    const { toast } = useToast();
+    const queryClient = useQueryClient();
+    const [showReply, setShowReply] = useState(false);
+    const [replyText, setReplyText] = useState("");
+
+    const { data: commentsData } = useQuery({
+        queryKey: [`comments-suggestion-${suggestion.id}`],
+        queryFn: () => publicFetch(`/api/comments/suggestion/${suggestion.id}`).then((r: any) => r.data || []),
+    });
+    const comments: Comment[] = commentsData || [];
+
+    const addReply = useMutation({
+        mutationFn: () => adminFetch("POST", `/api/admin/suggestions/${suggestion.id}/reply`, { content: replyText }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: [`comments-suggestion-${suggestion.id}`] });
+            toast({ title: "✅ 답글 등록 완료" });
+            setReplyText("");
+            setShowReply(false);
+        },
+        onError: () => toast({ title: "❌ 오류", variant: "destructive" })
+    });
+
+    return (
+        <div className="border border-slate-100 rounded-xl p-4 hover:border-indigo-200 transition-colors">
+            <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">{suggestion.category}</span>
+                        <span className="text-xs text-slate-400">{new Date(suggestion.createdAt).toLocaleDateString("ko-KR")}</span>
+                    </div>
+                    <p className="font-semibold text-slate-800">{suggestion.title}</p>
+                    <p className="text-sm text-slate-500 mt-1 line-clamp-2">{suggestion.content}</p>
+                    {comments.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                            {comments.map(c => (
+                                <div key={c.id} className="bg-blue-50 rounded-lg px-3 py-2 text-sm text-blue-800 flex items-start gap-2">
+                                    <span className="font-bold text-blue-600 text-xs mt-0.5 whitespace-nowrap">관리자↩</span>
+                                    <span>{c.content}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+                <div className="flex gap-1 flex-shrink-0">
+                    <Button variant="ghost" size="sm" className="text-indigo-500 hover:bg-indigo-50" onClick={() => setShowReply(!showReply)}>
+                        <Send className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="text-red-400 hover:bg-red-50" onClick={() => onDelete(suggestion.id)}>
+                        <Trash2 className="w-4 h-4" />
+                    </Button>
+                </div>
+            </div>
+            {showReply && (
+                <div className="mt-3 flex gap-2">
+                    <Textarea
+                        placeholder="답글을 입력하세요..."
+                        value={replyText}
+                        onChange={e => setReplyText(e.target.value)}
+                        className="min-h-[60px] text-sm"
+                    />
+                    <div className="flex flex-col gap-1">
+                        <Button
+                            size="sm"
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                            onClick={() => addReply.mutate()}
+                            disabled={!replyText.trim() || addReply.isPending}
+                        >
+                            {addReply.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setShowReply(false)}><X className="w-3 h-3" /></Button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ─── 메인 Admin 컴포넌트 ──────────────────────────────────────
+export default function Admin() {
+    const { toast } = useToast();
+    const queryClient = useQueryClient();
+    const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+    const [showVoteForm, setShowVoteForm] = useState(false);
+    const [showBoardForm, setShowBoardForm] = useState(false);
+    const [showPromiseForm, setShowPromiseForm] = useState(false);
+
+    useEffect(() => {
+        const token = localStorage.getItem(ADMIN_TOKEN_KEY);
+        setIsAdmin(!!token);
+    }, []);
+
+    const logoutMutation = useMutation({
+        mutationFn: () => fetch("/api/admin/logout", { method: "POST" }),
+        onSuccess: () => {
+            localStorage.removeItem(ADMIN_TOKEN_KEY);
+            setIsAdmin(false);
+            toast({ title: "로그아웃", description: "관리자 세션이 종료되었습니다." });
+        }
+    });
+
+    const { data: votesData, isLoading: votesLoading } = useQuery({
+        queryKey: ["/api/admin/votes"],
+        queryFn: () => adminFetch("GET", "/api/admin/votes").then((r: any) => r.data || r),
+        enabled: !!isAdmin
+    });
+    const votes: Vote[] = votesData || [];
+
+    const { data: suggestionsData, isLoading: suggestionsLoading } = useQuery({
+        queryKey: ["/api/suggestions"],
+        queryFn: () => publicFetch("/api/suggestions").then((r: any) => r.data || r),
+        enabled: !!isAdmin
+    });
+    const suggestions: Suggestion[] = suggestionsData || [];
+
+    const { data: boardsData, isLoading: boardsLoading } = useQuery({
+        queryKey: ["/api/board"],
+        queryFn: () => publicFetch("/api/board").then((r: any) => r.data || r),
+        enabled: !!isAdmin
+    });
+    const boards: Board[] = boardsData || [];
+
+    const { data: promisesData, isLoading: promisesLoading } = useQuery({
+        queryKey: ["/api/promises"],
+        queryFn: () => publicFetch("/api/promises").then((r: any) => r.data || r),
+        enabled: !!isAdmin
+    });
+    const promises: PromiseItem[] = promisesData || [];
+
+    const deleteVote = useMutation({
+        mutationFn: (id: string) => adminFetch("DELETE", `/api/admin/votes/${id}`),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/votes"] }); toast({ title: "✅ 투표 삭제 완료" }); },
+        onError: () => toast({ title: "❌ 삭제 실패", variant: "destructive" })
+    });
+    const deleteSuggestion = useMutation({
+        mutationFn: (id: string) => adminFetch("DELETE", `/api/admin/suggestions/${id}`),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/suggestions"] }); toast({ title: "✅ 의견 삭제 완료" }); },
+        onError: () => toast({ title: "❌ 삭제 실패", variant: "destructive" })
+    });
+    const deleteBoard = useMutation({
+        mutationFn: (id: string) => adminFetch("DELETE", `/api/admin/board/${id}`),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/board"] }); toast({ title: "✅ 게시글 삭제 완료" }); },
+        onError: () => toast({ title: "❌ 삭제 실패", variant: "destructive" })
+    });
+    const deletePromise = useMutation({
+        mutationFn: (id: string) => adminFetch("DELETE", `/api/admin/promises/${id}`),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/promises"] }); toast({ title: "✅ 공약 삭제 완료" }); },
+        onError: () => toast({ title: "❌ 삭제 실패", variant: "destructive" })
+    });
+
+    if (isAdmin === null) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <Loader2 className="w-10 h-10 animate-spin text-primary" />
+            </div>
+        );
+    }
+    if (!isAdmin) {
+        return <AdminLogin onLoginSuccess={() => setIsAdmin(true)} />;
+    }
+
+    const statCards = [
+        { title: "누적 투표", value: votes.length, icon: BarChart3, color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-100", trend: `${votes.length}건` },
+        { title: "시민 제안", value: suggestions.length, icon: MessageSquare, color: "text-indigo-600", bg: "bg-indigo-50", border: "border-indigo-100", trend: "검토필요" },
+        { title: "총 게시물", value: boards.length, icon: ClipboardList, color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-100", trend: "운영중" },
+        { title: "진행 공약", value: promises.filter(p => p.status === "진행중").length, icon: BookOpen, color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-100", trend: "진행중" },
+    ];
+
+    return (
+        <div className="min-h-screen bg-[#f8fafc]">
+            {/* Header */}
+            <header className="sticky top-0 z-30 w-full border-b bg-white/80 backdrop-blur-md">
+                <div className="container mx-auto px-4 h-16 flex items-center justify-between max-w-[1200px]">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white">
+                            <ShieldCheck className="w-5 h-5" />
+                        </div>
+                        <h1 className="text-lg font-bold text-slate-900 hidden sm:block">Admin Console</h1>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Link href="/">
+                            <Button variant="ghost" size="sm" className="gap-2 text-slate-600">
+                                <ExternalLink className="w-4 h-4" />사이트 보기
+                            </Button>
+                        </Link>
+                        <div className="h-4 w-[1px] bg-slate-200" />
+                        <Button
+                            variant="ghost" size="sm"
+                            className="text-red-500 hover:text-red-600 hover:bg-red-50 gap-2"
+                            onClick={() => logoutMutation.mutate()}
+                        >
+                            <LogOut className="w-4 h-4" />로그아웃
+                        </Button>
+                    </div>
+                </div>
+            </header>
+
+            <main className="container mx-auto px-4 py-8 max-w-[1200px]">
+                {/* Hero */}
+                <div className="mb-8 flex items-end justify-between flex-wrap gap-4">
+                    <div>
+                        <span className="text-xs font-semibold uppercase tracking-wider text-primary bg-primary/10 px-3 py-1 rounded-full">시스템 요약</span>
+                        <h2 className="text-3xl font-bold text-slate-900 mt-2">대시보드 홈</h2>
+                        <p className="text-slate-500 mt-1">플랫폼의 주요 지표와 데이터를 관리하세요.</p>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => queryClient.refetchQueries()}>
+                        <RefreshCcw className="w-4 h-4 mr-2" />새로고침
+                    </Button>
+                </div>
+
+                {/* Stat Cards */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    {statCards.map(stat => (
+                        <div key={stat.title} className={`bg-white rounded-2xl border ${stat.border} p-5 flex flex-col gap-4 shadow-sm hover:shadow-md transition-shadow`}>
+                            <div className="flex items-center justify-between gap-2">
+                                <div className={`w-10 h-10 rounded-xl ${stat.bg} flex items-center justify-center flex-shrink-0`}>
+                                    <stat.icon className={`w-5 h-5 ${stat.color}`} />
+                                </div>
+                                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${stat.bg} ${stat.color}`}>{stat.trend}</span>
+                            </div>
+                            <div>
+                                <p className="text-3xl font-bold text-slate-900 leading-none mb-1">{stat.value.toLocaleString()}</p>
+                                <p className="text-sm text-slate-500 font-medium whitespace-nowrap">{stat.title}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Tabs */}
+                <Tabs defaultValue="votes" className="space-y-6">
+                    <div className="overflow-x-auto">
+                        <TabsList className="bg-white border p-1 h-12 shadow-sm rounded-xl">
+                            <TabsTrigger value="votes" className="px-5 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-white">📊 투표 관리</TabsTrigger>
+                            <TabsTrigger value="suggestions" className="px-5 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-white">💬 의견 관리</TabsTrigger>
+                            <TabsTrigger value="board" className="px-5 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-white">📋 게시판 관리</TabsTrigger>
+                            <TabsTrigger value="promises" className="px-5 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-white">📌 공약 관리</TabsTrigger>
+                        </TabsList>
+                    </div>
+
+                    {/* ── 투표 관리 ── */}
+                    <TabsContent value="votes">
+                        <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+                            <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
+                                <div>
+                                    <h3 className="text-lg font-bold text-slate-900">투표 관리</h3>
+                                    <p className="text-sm text-slate-500">투표를 생성하고 현황을 관리합니다.</p>
+                                </div>
+                                <Button className="gap-2 bg-blue-600 hover:bg-blue-700" onClick={() => setShowVoteForm(!showVoteForm)}>
+                                    <Plus className="w-4 h-4" />신규 투표 생성
+                                </Button>
+                            </div>
+                            {showVoteForm && <VoteCreateForm onClose={() => setShowVoteForm(false)} />}
+                            {votesLoading ? (
+                                <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
+                            ) : votes.length === 0 ? (
+                                <p className="text-center py-12 text-slate-400">등록된 투표가 없습니다.</p>
+                            ) : (
+                                <div className="space-y-3">
+                                    {votes.map(vote => (
+                                        <div key={vote.id} className="flex items-center justify-between p-4 border border-slate-100 rounded-xl hover:border-blue-200 transition-colors group">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">{vote.category}</span>
+                                                    {vote.isHero && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">🔥 히어로</span>}
+                                                    <span className="text-xs text-slate-400">{new Date(vote.endDate).toLocaleDateString("ko-KR")} 마감</span>
+                                                </div>
+                                                <p className="font-semibold text-slate-800 mt-1">{vote.title}</p>
+                                                <div className="flex items-center gap-3 mt-1 text-sm text-slate-500 flex-wrap">
+                                                    <span className="flex items-center gap-1"><Users className="w-3 h-3" />
+                                                        {(vote.results || []).reduce((a: number, b: number) => a + b, 0)}명 참여
+                                                    </span>
+                                                    <div className="flex gap-2 text-xs">
+                                                        {(vote.options || []).map((opt, idx) => (
+                                                            <span key={idx} className="bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
+                                                                {opt}: {(vote.results || [])[idx] || 0}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <Button
+                                                variant="ghost" size="sm"
+                                                className="text-red-400 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity ml-2 flex-shrink-0"
+                                                onClick={() => deleteVote.mutate(vote.id)}
+                                                disabled={deleteVote.isPending}
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </TabsContent>
+
+                    {/* ── 의견 관리 ── */}
+                    <TabsContent value="suggestions">
+                        <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+                            <div className="mb-6">
+                                <h3 className="text-lg font-bold text-slate-900">의견 관리</h3>
+                                <p className="text-sm text-slate-500">시민 제안에 답글을 달거나 삭제할 수 있습니다. <Send className="w-3 h-3 inline" /> 버튼을 눌러 답글을 작성하세요.</p>
+                            </div>
+                            {suggestionsLoading ? (
+                                <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
+                            ) : suggestions.length === 0 ? (
+                                <p className="text-center py-12 text-slate-400">등록된 의견이 없습니다.</p>
+                            ) : (
+                                <div className="space-y-3">
+                                    {suggestions.map(s => (
+                                        <SuggestionRow key={s.id} suggestion={s} onDelete={id => deleteSuggestion.mutate(id)} />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </TabsContent>
+
+                    {/* ── 게시판 관리 ── */}
+                    <TabsContent value="board">
+                        <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+                            <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
+                                <div>
+                                    <h3 className="text-lg font-bold text-slate-900">게시판 관리</h3>
+                                    <p className="text-sm text-slate-500">공지 및 게시글과 이미지를 관리합니다.</p>
+                                </div>
+                                <Button className="gap-2 bg-amber-600 hover:bg-amber-700" onClick={() => setShowBoardForm(!showBoardForm)}>
+                                    <Plus className="w-4 h-4" />게시글 작성
+                                </Button>
+                            </div>
+                            {showBoardForm && <BoardCreateForm onClose={() => setShowBoardForm(false)} />}
+                            {boardsLoading ? (
+                                <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
+                            ) : boards.length === 0 ? (
+                                <p className="text-center py-12 text-slate-400">등록된 게시글이 없습니다.</p>
+                            ) : (
+                                <div className="space-y-3">
+                                    {boards.map(board => (
+                                        <div key={board.id} className="flex gap-4 p-4 border border-slate-100 rounded-xl hover:border-amber-200 transition-colors group">
+                                            {(board as any).imageUrl && (
+                                                <img
+                                                    src={(board as any).imageUrl}
+                                                    alt="썸네일"
+                                                    className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
+                                                    onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                                                />
+                                            )}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
+                                                        {board.type === "notice" ? "공지" : board.type === "policy" ? "정책" : "자유"}
+                                                    </span>
+                                                    {board.isPinned && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">📌 고정</span>}
+                                                    <span className="text-xs text-slate-400">{new Date(board.createdAt).toLocaleDateString("ko-KR")}</span>
+                                                </div>
+                                                <p className="font-semibold text-slate-800 mt-1">{board.title}</p>
+                                                <p className="text-sm text-slate-500 line-clamp-1 mt-0.5">{board.content}</p>
+                                            </div>
+                                            <Button
+                                                variant="ghost" size="sm"
+                                                className="text-red-400 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                                                onClick={() => deleteBoard.mutate(board.id)}
+                                                disabled={deleteBoard.isPending}
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </TabsContent>
+
+                    {/* ── 공약 관리 ── */}
+                    <TabsContent value="promises">
+                        <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+                            <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
+                                <div>
+                                    <h3 className="text-lg font-bold text-slate-900">공약 관리</h3>
+                                    <p className="text-sm text-slate-500">공약과 이행 상태를 등록하고 관리합니다.</p>
+                                </div>
+                                <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700" onClick={() => setShowPromiseForm(!showPromiseForm)}>
+                                    <Plus className="w-4 h-4" />공약 등록
+                                </Button>
+                            </div>
+                            {showPromiseForm && <PromiseCreateForm onClose={() => setShowPromiseForm(false)} />}
+                            {promisesLoading ? (
+                                <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
+                            ) : promises.length === 0 ? (
+                                <p className="text-center py-12 text-slate-400">등록된 공약이 없습니다.</p>
+                            ) : (
+                                <div className="space-y-3">
+                                    {promises.map(promise => (
+                                        <div key={promise.id} className="flex gap-4 p-4 border border-slate-100 rounded-xl hover:border-emerald-200 transition-colors group">
+                                            {promise.imageUrl && (
+                                                <img
+                                                    src={promise.imageUrl}
+                                                    alt="공약 이미지"
+                                                    className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
+                                                    onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                                                />
+                                            )}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">{promise.category}</span>
+                                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${promise.status === "이행완료" ? "bg-blue-100 text-blue-700" :
+                                                        promise.status === "진행중" ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"
+                                                        }`}>{promise.status}</span>
+                                                </div>
+                                                <p className="font-semibold text-slate-800 mt-1">{promise.title}</p>
+                                                <div className="mt-2 flex items-center gap-2">
+                                                    <div className="flex-1 bg-slate-100 rounded-full h-1.5">
+                                                        <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: `${promise.progress}%` }} />
+                                                    </div>
+                                                    <span className="text-xs text-slate-500 whitespace-nowrap">{promise.progress}%</span>
+                                                </div>
+                                            </div>
+                                            <Button
+                                                variant="ghost" size="sm"
+                                                className="text-red-400 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                                                onClick={() => deletePromise.mutate(promise.id)}
+                                                disabled={deletePromise.isPending}
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </TabsContent>
+                </Tabs>
+            </main>
+        </div>
     );
 }

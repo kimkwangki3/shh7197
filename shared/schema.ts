@@ -140,8 +140,9 @@ export const votes = pgTable("votes", {
   description: text("description").notNull(),
   category: text("category").notNull(), // 교통, 복지, 환경 등
   endDate: timestamp("end_date").notNull(),
-  agreeCount: integer("agree_count").notNull().default(0),
-  disagreeCount: integer("disagree_count").notNull().default(0),
+  options: text("options").array().notNull().default([]), // 투표 항목들
+  results: integer("results").array().notNull().default([]), // 각 항목별 득표 수
+  allowMultiple: boolean("allow_multiple").notNull().default(false), // 복수 선택 가능 여부
   isHero: boolean("is_hero").notNull().default(false), // 지금 뜨거운 투표 여부
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
@@ -164,6 +165,7 @@ export const boards = pgTable("boards", {
   type: text("type").notNull(), // notice, policy, free
   title: text("title").notNull(),
   content: text("content").notNull(),
+  imageUrl: text("image_url"),
   isPinned: boolean("is_pinned").notNull().default(false),
   viewCount: integer("view_count").notNull().default(0),
   likeCount: integer("like_count").notNull().default(0),
@@ -241,8 +243,11 @@ export const insertStatisticSchema = createInsertSchema(statistics).omit({
 
 export const insertVoteSchema = createInsertSchema(votes).omit({
   id: true,
+  results: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  endDate: z.coerce.date(),
 });
 
 export const insertSuggestionSchema = createInsertSchema(suggestions).omit({
@@ -254,11 +259,19 @@ export const insertBoardSchema = createInsertSchema(boards).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  viewCount: true,
+  likeCount: true,
+}).extend({
+  title: z.string().min(1, "제목을 입력해주세요"),
+  content: z.string().min(1, "내용을 입력해주세요"),
 });
 
 export const insertPromiseSchema = createInsertSchema(promises).omit({
   id: true,
   createdAt: true,
+}).extend({
+  title: z.string().min(1, "제목을 입력해주세요"),
+  description: z.string().min(1, "설명을 입력해주세요"),
 });
 
 export const insertCommentSchema = createInsertSchema(comments).omit({

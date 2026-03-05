@@ -37,7 +37,7 @@ export default function BoardPage() {
     const [selectedPost, setSelectedPost] = useState<Board | null>(null);
 
     const { data: posts, isLoading } = useQuery<{ success: boolean; data: Board[] }>({
-        queryKey: ["/api/board", { type: filter }],
+        queryKey: [filter === "all" ? "/api/board" : `/api/board?type=${filter}`],
     });
 
     const mutation = useMutation({
@@ -228,7 +228,17 @@ export default function BoardPage() {
                                                     {post.title}
                                                 </h4>
 
-                                                <p className="text-[14px] text-slate-500 font-medium line-clamp-1 opacity-70">
+                                                {post.imageUrl && (
+                                                    <div className="w-full h-40 rounded-2xl overflow-hidden mt-1 mb-2">
+                                                        <img
+                                                            src={post.imageUrl}
+                                                            alt={post.title}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    </div>
+                                                )}
+
+                                                <p className="text-[14px] text-slate-500 font-medium line-clamp-2 opacity-70">
                                                     {post.content}
                                                 </p>
 
@@ -282,6 +292,17 @@ export default function BoardPage() {
                                     </div>
                                 </div>
                                 <div className="h-[1px] bg-slate-100" />
+
+                                {selectedPost.imageUrl && (
+                                    <div className="w-full rounded-2xl overflow-hidden shadow-sm">
+                                        <img
+                                            src={selectedPost.imageUrl}
+                                            alt={selectedPost.title}
+                                            className="w-full h-auto object-cover"
+                                        />
+                                    </div>
+                                )}
+
                                 <p className="text-[15px] text-slate-600 leading-[1.7] whitespace-pre-wrap font-medium">
                                     {selectedPost.content}
                                 </p>

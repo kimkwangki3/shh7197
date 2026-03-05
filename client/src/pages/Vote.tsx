@@ -25,18 +25,40 @@ import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { useAuth } from "@/hooks/use-auth";
 
+import { useSearch } from "wouter";
+
 export default function Vote() {
     const { checkAuthOrLogin } = useAuth();
     const { toast } = useToast();
+    const search = useSearch();
     const [votedIds, setVotedIds] = useState<number[]>([]);
+    const [activeTab, setActiveTab] = useState<'ongoing' | 'ended'>('ongoing');
 
     const { data: votes, isLoading } = useQuery<{ success: boolean; data: VoteType[] }>({
         queryKey: ["/api/votes"],
     });
 
+    React.useEffect(() => {
+        const params = new URLSearchParams(search);
+        const id = params.get("id");
+        if (id && votes?.data) {
+            const targetVote = votes.data.find(v => v.id === id);
+            if (targetVote) {
+                const isEnded = new Date(targetVote.endDate) < new Date();
+                setActiveTab(isEnded ? 'ended' : 'ongoing');
+
+                // Optional: Scroll to the element after a short delay
+                setTimeout(() => {
+                    const el = document.getElementById(`vote-${id}`);
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 300);
+            }
+        }
+    }, [search, votes?.data]);
+
     const mutation = useMutation({
-        mutationFn: async ({ id, type }: { id: number; type: "agree" | "disagree" }) => {
-            const res = await apiRequest("POST", `/api/votes/${id}/vote`, { type });
+        mutationFn: async ({ id, optionIndex }: { id: number; optionIndex: number }) => {
+            const res = await apiRequest("POST", `/api/votes/${id}/vote`, { optionIndices: [optionIndex] });
             return res.json();
         },
         onSuccess: (data, variables) => {
@@ -49,7 +71,7 @@ export default function Vote() {
         },
     });
 
-    const handleVote = (id: number, type: "agree" | "disagree") => {
+    const handleVote = (id: number, optionIndex: number) => {
         if (votedIds.includes(id)) {
             toast({
                 title: "이미 참여하셨습니다.",
@@ -58,8 +80,17 @@ export default function Vote() {
             });
             return;
         }
-        mutation.mutate({ id, type });
+        mutation.mutate({ id, optionIndex });
     };
+
+    const filteredVotes = React.useMemo(() => {
+        if (!votes?.data) return [];
+        const now = new Date();
+        return votes.data.filter((vote: VoteType) => {
+            const isEnded = new Date(vote.endDate) < now;
+            return activeTab === 'ongoing' ? !isEnded : isEnded;
+        });
+    }, [votes?.data, activeTab]);
 
     if (isLoading && !votes) {
         return (
@@ -90,34 +121,73 @@ export default function Vote() {
                 </div>
             </div>
 
+            {/* Tab Navigation */}
+            <div className="px-5 mt-6 mb-2">
+                <div className="bg-white/80 backdrop-blur-sm p-1.5 rounded-2xl border border-slate-100 flex gap-1 shadow-sm">
+                    <button
+                        onClick={() => setActiveTab('ongoing')}
+                        className={cn(
+                            "flex-1 py-3 text-[14px] font-black rounded-xl transition-all duration-300",
+                            activeTab === 'ongoing'
+                                ? "bg-primary text-white shadow-md shadow-primary/20 scale-[1.02]"
+                                : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                        )}
+                    >
+                        진행 중인 투표
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('ended')}
+                        className={cn(
+                            "flex-1 py-3 text-[14px] font-black rounded-xl transition-all duration-300",
+                            activeTab === 'ended'
+                                ? "bg-slate-800 text-white shadow-md shadow-slate-800/20 scale-[1.02]"
+                                : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                        )}
+                    >
+                        종료된 투표
+                    </button>
+                </div>
+            </div>
+
             <div className="p-5 flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
 
-                {votes?.data?.length === 0 ? (
+                {filteredVotes.length === 0 ? (
                     <div className="py-24 flex flex-col items-center justify-center text-center">
                         <div className="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center mb-6">
                             <BarChart3 className="w-9 h-9 text-slate-300" />
                         </div>
-                        <p className="text-[15px] font-black text-slate-400">진행 중인 투표가 없습니다.<br />곧 새로운 주제로 찾아뵙겠습니다.</p>
+                        <p className="text-[15px] font-black text-slate-400">
+                            {activeTab === 'ongoing'
+                                ? "진행 중인 투표가 없습니다.\n곧 새로운 주제로 찾아뵙겠습니다."
+                                : "종료된 투표가 없습니다."}
+                        </p>
                     </div>
                 ) : (
-                    votes?.data?.map((item) => {
-                        const total = item.agreeCount + item.disagreeCount;
-                        const agreeRate = total === 0 ? 0 : Math.round((item.agreeCount / total) * 100);
-                        const disagreeRate = total === 0 ? 0 : 100 - agreeRate;
+                    filteredVotes.map((item) => {
+                        const results = item.results || [];
+                        const options = item.options || [];
+                        const total = results.reduce((acc, curr) => acc + curr, 0);
                         const isVoted = votedIds.includes(item.id);
+                        const isEnded = new Date(item.endDate) < new Date();
 
                         return (
-                            <Card key={item.id} className="border-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-[40px] bg-white overflow-hidden transition-all duration-300">
+                            <Card key={item.id} id={`vote-${item.id}`} className={cn(
+                                "border-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-[40px] bg-white overflow-hidden transition-all duration-300",
+                                isEnded && "opacity-80 grayscale-[0.3]"
+                            )}>
                                 <CardContent className="p-0">
                                     {/* Content Section */}
                                     <div className="p-8 pb-6">
                                         <div className="flex justify-between items-center mb-6">
-                                            <span className="text-[10px] font-black px-3 py-1.5 rounded-xl bg-slate-100 text-slate-500 tracking-wider">
-                                                진행 중
+                                            <span className={cn(
+                                                "text-[10px] font-black px-3 py-1.5 rounded-xl tracking-wider",
+                                                isEnded ? "bg-slate-200 text-slate-500" : "bg-primary/20 text-primary"
+                                            )}>
+                                                {isEnded ? "투표 종료" : "진행 중"}
                                             </span>
                                             <div className="flex items-center gap-1.5 text-slate-300 text-[11px] font-bold">
                                                 <Calendar className="w-3.5 h-3.5" />
-                                                마감 D-12
+                                                {isEnded ? "기한 만료" : `마감 ${format(new Date(item.endDate), "M/d", { locale: ko })}`}
                                             </div>
                                         </div>
 
@@ -128,68 +198,55 @@ export default function Vote() {
                                             {item.description}
                                         </p>
 
-                                        {/* Visualization */}
-                                        <div className="space-y-6 mb-8">
-                                            <div className="relative h-14 w-full bg-slate-50 rounded-[20px] overflow-hidden flex">
-                                                {/* Agree Progress */}
-                                                <div
-                                                    className="h-full bg-primary flex items-center px-4 transition-all duration-1000"
-                                                    style={{ width: `${agreeRate}%` }}
-                                                >
-                                                    {agreeRate > 15 && (
-                                                        <span className="text-white text-[13px] font-black">{agreeRate}%</span>
-                                                    )}
-                                                </div>
-                                                {/* Disagree Progress */}
-                                                <div
-                                                    className="h-full bg-slate-200 flex items-center justify-end px-4 transition-all duration-1000"
-                                                    style={{ width: `${disagreeRate}%` }}
-                                                >
-                                                    {disagreeRate > 15 && (
-                                                        <span className="text-slate-500 text-[13px] font-black">{disagreeRate}%</span>
-                                                    )}
-                                                </div>
-                                            </div>
+                                        {/* Visualization & Options */}
+                                        <div className="space-y-4 mb-8">
+                                            {options.map((option, idx) => {
+                                                const count = results[idx] || 0;
+                                                const rate = total === 0 ? 0 : Math.round((count / total) * 100);
 
-                                            <div className="flex justify-between px-1">
-                                                <div className="flex flex-col">
-                                                    <span className="text-[11px] font-black text-primary mb-0.5">찬성</span>
-                                                    <span className="text-[17px] font-black text-slate-800">{item.agreeCount.toLocaleString()}표</span>
-                                                </div>
-                                                <div className="flex flex-col text-right">
-                                                    <span className="text-[11px] font-black text-slate-400 mb-0.5">반대</span>
-                                                    <span className="text-[17px] font-black text-slate-500">{item.disagreeCount.toLocaleString()}표</span>
-                                                </div>
-                                            </div>
+                                                return (
+                                                    <div key={idx} className="space-y-2">
+                                                        <div className="flex justify-between items-center px-1">
+                                                            <span className="text-[13px] font-black text-slate-700">{option}</span>
+                                                            <span className="text-[13px] font-black text-slate-400">{count.toLocaleString()}표 ({rate}%)</span>
+                                                        </div>
+                                                        <div
+                                                            className={cn(
+                                                                "relative h-12 w-full bg-slate-50 rounded-2xl overflow-hidden group",
+                                                                !isEnded && !isVoted && "cursor-pointer active:scale-[0.98] transition-transform"
+                                                            )}
+                                                            onClick={() => !isEnded && !isVoted && handleVote(item.id, idx)}
+                                                        >
+                                                            <div
+                                                                className={cn(
+                                                                    "h-full transition-all duration-1000",
+                                                                    idx % 2 === 0 ? "bg-primary" : "bg-blue-400",
+                                                                    isEnded && "bg-slate-400"
+                                                                )}
+                                                                style={{ width: `${rate}%` }}
+                                                            />
+                                                            <div className="absolute inset-0 flex items-center justify-between px-4 pointer-events-none">
+                                                                <span className={cn(
+                                                                    "text-[12px] font-black",
+                                                                    rate > 15 ? "text-white" : "text-slate-400"
+                                                                )}>
+                                                                    {option}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
 
-                                        {/* Voting Buttons */}
-                                        <div className="grid grid-cols-2 gap-3 mb-2">
-                                            <Button
-                                                onClick={() => checkAuthOrLogin(() => handleVote(item.id, 'agree'))}
-                                                disabled={isVoted || mutation.isPending}
-                                                className={cn(
-                                                    "h-14 rounded-2xl font-black text-[15px] transition-all flex items-center justify-center gap-2",
-                                                    isVoted ? "bg-slate-100 text-slate-300" : "bg-primary text-white shadow-xl shadow-blue-100 active:scale-95"
-                                                )}
-                                            >
-                                                <ThumbsUp className="w-4.5 h-4.5" /> 찬성
-                                            </Button>
-                                            <Button
-                                                onClick={() => checkAuthOrLogin(() => handleVote(item.id, 'disagree'))}
-                                                disabled={isVoted || mutation.isPending}
-                                                className={cn(
-                                                    "h-14 rounded-2xl font-black text-[15px] transition-all flex items-center justify-center gap-2 border-2",
-                                                    isVoted ? "bg-slate-50 border-slate-50 text-slate-300" : "bg-white border-slate-100 text-slate-400 active:scale-95 hover:bg-slate-50"
-                                                )}
-                                            >
-                                                <ThumbsDown className="w-4.5 h-4.5" /> 반대
-                                            </Button>
-                                        </div>
 
-                                        {isVoted && (
-                                            <p className="text-center text-[12px] font-bold text-primary mt-4 flex items-center justify-center gap-1.5 animate-in fade-in slide-in-from-top-1">
-                                                <CheckCircle2 className="w-3.5 h-3.5" /> 참여가 완료된 투표입니다.
+                                        {(isVoted || isEnded) && (
+                                            <p className="text-center text-[12px] font-bold text-slate-400 mt-4 flex items-center justify-center gap-1.5 animate-in fade-in slide-in-from-top-1">
+                                                {isEnded ? (
+                                                    <><AlertCircle className="w-3.5 h-3.5" /> 종료된 투표입니다.</>
+                                                ) : (
+                                                    <><CheckCircle2 className="w-3.5 h-3.5 text-primary" /> 참여가 완료된 투표입니다.</>
+                                                )}
                                             </p>
                                         )}
                                     </div>
@@ -203,7 +260,7 @@ export default function Vote() {
                                             </div>
                                             <div className="flex items-center gap-1.5 text-slate-400">
                                                 <MessageCircle className="w-4 h-4" />
-                                                <span className="text-[12px] font-black">42개 댓글</span>
+                                                <span className="text-[12px] font-black">의견 나눔</span>
                                             </div>
                                         </div>
                                         <button className="text-slate-400 hover:text-primary transition-colors">

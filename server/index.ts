@@ -39,7 +39,7 @@ app.use((req, res, next) => {
 (async () => {
   try {
     log("Starting server initialization...");
-    
+
     const server = await registerRoutes(app);
     log("Routes registered successfully");
 
@@ -67,14 +67,14 @@ app.use((req, res, next) => {
     // this serves both the API and the client.
     // It is the only port that is not firewalled.
     const port = parseInt(process.env.PORT || '5000', 10);
-    
+
     // Validate port configuration
     if (isNaN(port) || port < 1 || port > 65535) {
       throw new Error(`Invalid port configuration: ${process.env.PORT}`);
     }
-    
+
     log(`Attempting to start server on port ${port}...`);
-    
+
     // Use simpler listen configuration for Cloud Run compatibility
     server.listen(port, "0.0.0.0", () => {
       log(`Server successfully started on port ${port}`);

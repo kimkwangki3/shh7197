@@ -43,7 +43,7 @@ import {
   type InsertComment
 } from "../shared/schema.ts";
 import { db } from "./db.ts";
-import { eq, desc, asc } from "drizzle-orm";
+import { eq, desc, asc, sql } from "drizzle-orm";
 
 // modify the interface with any CRUD methods
 // you might need
@@ -106,25 +106,30 @@ export interface IStorage {
   getVote(id: string): Promise<Vote | undefined>;
   createVote(vote: InsertVote): Promise<Vote>;
   updateVoteCount(id: string, type: 'agree' | 'disagree'): Promise<Vote>;
+  deleteVote(id: string): Promise<void>;
 
   // Suggestion methods
   getAllSuggestions(): Promise<Suggestion[]>;
   createSuggestion(suggestion: InsertSuggestion): Promise<Suggestion>;
   updateSuggestionLikes(id: string): Promise<Suggestion>;
+  deleteSuggestion(id: string): Promise<void>;
 
   // Board methods
   getBoardItems(type?: string): Promise<Board[]>;
   getBoardItem(id: string): Promise<Board | undefined>;
   createBoardItem(item: InsertBoard): Promise<Board>;
+  deleteBoardItem(id: string): Promise<void>;
 
   // Promise methods
   getAllPromises(): Promise<PromiseItem[]>;
   getPromisesByCategory(category: string): Promise<PromiseItem[]>;
   createPromise(promise: InsertPromise): Promise<PromiseItem>;
+  deletePromise(id: string): Promise<void>;
 
   // Comment methods
   getComments(targetType: string, targetId: string): Promise<Comment[]>;
   createComment(comment: InsertComment): Promise<Comment>;
+  deleteComment(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -384,22 +389,37 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createVote(insertVote: InsertVote): Promise<Vote> {
-    const [vote] = await db.insert(votes).values(insertVote).returning();
+    const [vote] = await db.insert(votes).values({
+      ...insertVote,
+      results: new Array(insertVote.options.length).fill(0),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).returning();
     return vote;
   }
 
-  async updateVoteCount(id: string, type: "agree" | "disagree"): Promise<Vote> {
-    const [vote] = await db
+  async updateVoteCount(id: string, optionIndices: number[]): Promise<Vote> {
+    // 다중 선택 또는 단일 선택 모두 처리 가능한 로직
+    const voteData = await this.getVote(id);
+    if (!voteData) throw new Error("Vote not found");
+
+    const newResults = [...voteData.results];
+    optionIndices.forEach(index => {
+      if (index >= 0 && index < newResults.length) {
+        newResults[index]++;
+      }
+    });
+
+    const [updatedVote] = await db
       .update(votes)
       .set({
-        agreeCount: type === "agree" ? sql`${votes.agreeCount} + 1` : votes.agreeCount,
-        disagreeCount: type === "disagree" ? sql`${votes.disagreeCount} + 1` : votes.disagreeCount,
+        results: newResults,
         updatedAt: new Date(),
       })
       .where(eq(votes.id, id))
       .returning();
-    if (!vote) throw new Error("Vote not found");
-    return vote;
+
+    return updatedVote;
   }
 
   async updateVote(id: string, updateVote: Partial<InsertVote>): Promise<Vote> {
@@ -455,7 +475,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createBoardItem(item: InsertBoard): Promise<Board> {
-    const [board] = await db.insert(boards).values(item).returning();
+    const [board] = await db.insert(boards).values({
+      ...item,
+      viewCount: 0,
+      likeCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).returning();
     return board;
   }
 
@@ -483,7 +509,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createPromise(promise: InsertPromise): Promise<PromiseItem> {
-    const [item] = await db.insert(promises).values(promise).returning();
+    const [item] = await db.insert(promises).values({
+      ...promise,
+      createdAt: new Date(),
+    }).returning();
     return item;
   }
 
@@ -516,6 +545,11 @@ export class DatabaseStorage implements IStorage {
     const [comment] = await db.insert(comments).values(insertComment).returning();
     return comment;
   }
+
+  async deleteComment(id: string): Promise<void> {
+    await db.delete(comments).where(eq(comments.id, id));
+  }
 }
+
 
 export const storage = new DatabaseStorage();

@@ -96,6 +96,7 @@
     "@types/ws": "^8.5.13",
     "cross-env": "^10.1.0",
     "drizzle-kit": "^0.30.4",
+    "playwright": "^1.58.2",
     "tsx": "^4.19.1"
   },
   "optionalDependencies": {

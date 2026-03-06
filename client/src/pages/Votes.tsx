@@ -37,7 +37,7 @@ export default function Votes() {
     return (
         <div className="p-4 flex flex-col gap-6 animate-in fade-in duration-500 bg-slate-50 min-h-screen">
             <header className="mb-2 px-2">
-                <h2 className="text-2xl font-black text-slate-800 mb-1">시민 투표</h2>
+                <h2 className="text-2xl font-black text-slate-800 mb-1">신대지구 주민 투표</h2>
                 <p className="text-sm text-slate-500 font-medium font-['Pretendard']">우리 동네의 중한 결정을 직접 내랴주세요.</p>
             </header>
 

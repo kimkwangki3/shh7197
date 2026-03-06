@@ -420,6 +420,7 @@ export default function Admin() {
         onSuccess: () => {
             localStorage.removeItem(ADMIN_TOKEN_KEY);
             setIsAdmin(false);
+            queryClient.invalidateQueries({ queryKey: ["/api/admin/check"] });
             toast({ title: "로그아웃", description: "관리자 세션이 종료되었습니다." });
         }
     });
@@ -486,7 +487,7 @@ export default function Admin() {
 
     const statCards = [
         { title: "누적 투표", value: votes.length, icon: BarChart3, color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-100", trend: `${votes.length}건` },
-        { title: "시민 제안", value: suggestions.length, icon: MessageSquare, color: "text-indigo-600", bg: "bg-indigo-50", border: "border-indigo-100", trend: "검토필요" },
+        { title: "신대지구 제안", value: suggestions.length, icon: MessageSquare, color: "text-indigo-600", bg: "bg-indigo-50", border: "border-indigo-100", trend: "검토필요" },
         { title: "총 게시물", value: boards.length, icon: ClipboardList, color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-100", trend: "운영중" },
         { title: "진행 공약", value: promises.filter(p => p.status === "진행중").length, icon: BookOpen, color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-100", trend: "진행중" },
     ];
@@ -623,7 +624,7 @@ export default function Admin() {
                         <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
                             <div className="mb-6">
                                 <h3 className="text-lg font-bold text-slate-900">의견 관리</h3>
-                                <p className="text-sm text-slate-500">시민 제안에 답글을 달거나 삭제할 수 있습니다. <Send className="w-3 h-3 inline" /> 버튼을 눌러 답글을 작성하세요.</p>
+                                <p className="text-sm text-slate-500">신대지구 제안에 답글을 달거나 삭제할 수 있습니다. <Send className="w-3 h-3 inline" /> 버튼을 눌러 답글을 작성하세요.</p>
                             </div>
                             {suggestionsLoading ? (
                                 <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>

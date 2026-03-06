@@ -31,6 +31,7 @@ import {
   boards,
   promises,
   comments,
+  likes,
   type Vote,
   type InsertVote,
   type Suggestion,
@@ -40,10 +41,12 @@ import {
   type PromiseItem,
   type InsertPromise,
   type Comment,
-  type InsertComment
+  type InsertComment,
+  type Like,
+  type InsertLike
 } from "../shared/schema.ts";
 import { db } from "./db.ts";
-import { eq, desc, asc, sql } from "drizzle-orm";
+import { eq, desc, asc, sql, and } from "drizzle-orm";
 
 // modify the interface with any CRUD methods
 // you might need
@@ -52,7 +55,6 @@ export interface IStorage {
   // User methods
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
-  getUserByKakaoId(kakaoId: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
 
   // Message methods
@@ -105,31 +107,43 @@ export interface IStorage {
   getHeroVote(): Promise<Vote | undefined>;
   getVote(id: string): Promise<Vote | undefined>;
   createVote(vote: InsertVote): Promise<Vote>;
-  updateVoteCount(id: string, type: 'agree' | 'disagree'): Promise<Vote>;
+  updateVoteCount(id: string, optionIndices: number[]): Promise<Vote>;
   deleteVote(id: string): Promise<void>;
 
   // Suggestion methods
   getAllSuggestions(): Promise<Suggestion[]>;
+  getSuggestion(id: string): Promise<Suggestion | undefined>;
   createSuggestion(suggestion: InsertSuggestion): Promise<Suggestion>;
-  updateSuggestionLikes(id: string): Promise<Suggestion>;
+  updateSuggestion(id: string, suggestion: Partial<InsertSuggestion>): Promise<Suggestion>;
   deleteSuggestion(id: string): Promise<void>;
+  updateSuggestionLikes(id: string, ipAddress: string): Promise<Suggestion>;
 
   // Board methods
   getBoardItems(type?: string): Promise<Board[]>;
   getBoardItem(id: string): Promise<Board | undefined>;
   createBoardItem(item: InsertBoard): Promise<Board>;
+  updateBoardItem(id: string, updateItem: Partial<InsertBoard>): Promise<Board>;
+  updateBoardLikes(id: string, ipAddress: string): Promise<Board>;
   deleteBoardItem(id: string): Promise<void>;
 
   // Promise methods
   getAllPromises(): Promise<PromiseItem[]>;
   getPromisesByCategory(category: string): Promise<PromiseItem[]>;
   createPromise(promise: InsertPromise): Promise<PromiseItem>;
+  updatePromise(id: string, updateItem: Partial<InsertPromise>): Promise<PromiseItem>;
   deletePromise(id: string): Promise<void>;
 
   // Comment methods
   getComments(targetType: string, targetId: string): Promise<Comment[]>;
+  getComment(id: string): Promise<Comment | undefined>;
   createComment(comment: InsertComment): Promise<Comment>;
+  updateComment(id: string, comment: Partial<InsertComment>): Promise<Comment>;
+  updateCommentLikes(id: string, ipAddress: string): Promise<Comment>;
   deleteComment(id: string): Promise<void>;
+
+  // Like methods
+  hasLiked(targetType: string, targetId: string, ipAddress: string): Promise<boolean>;
+  createLike(like: InsertLike): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -140,11 +154,6 @@ export class DatabaseStorage implements IStorage {
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user || undefined;
-  }
-
-  async getUserByKakaoId(kakaoId: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.kakaoId, kakaoId));
     return user || undefined;
   }
 
@@ -391,7 +400,7 @@ export class DatabaseStorage implements IStorage {
   async createVote(insertVote: InsertVote): Promise<Vote> {
     const [vote] = await db.insert(votes).values({
       ...insertVote,
-      results: new Array(insertVote.options.length).fill(0),
+      results: new Array(insertVote.options?.length || 0).fill(0),
       createdAt: new Date(),
       updatedAt: new Date(),
     }).returning();
@@ -440,15 +449,35 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(suggestions).orderBy(desc(suggestions.createdAt));
   }
 
+  async getSuggestion(id: string): Promise<Suggestion | undefined> {
+    const [suggestion] = await db.select().from(suggestions).where(eq(suggestions.id, id));
+    return suggestion || undefined;
+  }
+
   async createSuggestion(insertSuggestion: InsertSuggestion): Promise<Suggestion> {
     const [suggestion] = await db.insert(suggestions).values(insertSuggestion).returning();
     return suggestion;
   }
 
-  async updateSuggestionLikes(id: string): Promise<Suggestion> {
+  async updateSuggestion(id: string, updateData: Partial<InsertSuggestion>): Promise<Suggestion> {
     const [suggestion] = await db
       .update(suggestions)
-      .set({ likeCount: sql`${suggestions.likeCount} + 1` })
+      .set(updateData)
+      .where(eq(suggestions.id, id))
+      .returning();
+    if (!suggestion) throw new Error("Suggestion not found");
+    return suggestion;
+  }
+
+  async updateSuggestionLikes(id: string, ipAddress: string): Promise<Suggestion> {
+    const liked = await this.hasLiked("suggestion", id, ipAddress);
+    if (liked) return (await this.getSuggestion(id))!;
+
+    await this.createLike({ targetType: "suggestion", targetId: id, ipAddress });
+
+    const [suggestion] = await db
+      .update(suggestions)
+      .set({ likeCount: sql`like_count + 1` })
       .where(eq(suggestions.id, id))
       .returning();
     if (!suggestion) throw new Error("Suggestion not found");
@@ -489,6 +518,21 @@ export class DatabaseStorage implements IStorage {
     const [board] = await db
       .update(boards)
       .set({ ...updateItem, updatedAt: new Date() })
+      .where(eq(boards.id, id))
+      .returning();
+    if (!board) throw new Error("Board item not found");
+    return board;
+  }
+
+  async updateBoardLikes(id: string, ipAddress: string): Promise<Board> {
+    const liked = await this.hasLiked("board", id, ipAddress);
+    if (liked) return (await this.getBoardItem(id))!;
+
+    await this.createLike({ targetType: "board", targetId: id, ipAddress });
+
+    const [board] = await db
+      .update(boards)
+      .set({ likeCount: sql`like_count + 1` })
       .where(eq(boards.id, id))
       .returning();
     if (!board) throw new Error("Board item not found");
@@ -541,9 +585,58 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(comments.createdAt));
   }
 
+  async getComment(id: string): Promise<Comment | undefined> {
+    const [comment] = await db.select().from(comments).where(eq(comments.id, id));
+    return comment || undefined;
+  }
+
   async createComment(insertComment: InsertComment): Promise<Comment> {
     const [comment] = await db.insert(comments).values(insertComment).returning();
     return comment;
+  }
+
+  async updateComment(id: string, updateData: Partial<InsertComment>): Promise<Comment> {
+    const [comment] = await db
+      .update(comments)
+      .set(updateData)
+      .where(eq(comments.id, id))
+      .returning();
+    if (!comment) throw new Error("Comment not found");
+    return comment;
+  }
+
+  async updateCommentLikes(id: string, ipAddress: string): Promise<Comment> {
+    const liked = await this.hasLiked("comment", id, ipAddress);
+    if (liked) return (await this.getComment(id))!;
+
+    await this.createLike({ targetType: "comment", targetId: id, ipAddress });
+
+    const [comment] = await db
+      .update(comments)
+      .set({ likeCount: sql`like_count + 1` })
+      .where(eq(comments.id, id))
+      .returning();
+    if (!comment) throw new Error("Comment not found");
+    return comment;
+  }
+
+  async hasLiked(targetType: string, targetId: string, ipAddress: string): Promise<boolean> {
+    const [like] = await db
+      .select()
+      .from(likes)
+      .where(
+        and(
+          eq(likes.targetType, targetType),
+          eq(likes.targetId, targetId),
+          eq(likes.ipAddress, ipAddress)
+        )
+      )
+      .limit(1);
+    return !!like;
+  }
+
+  async createLike(like: InsertLike): Promise<void> {
+    await db.insert(likes).values(like);
   }
 
   async deleteComment(id: string): Promise<void> {

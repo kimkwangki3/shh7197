@@ -20,12 +20,15 @@ import {
     X,
     FileText,
     MessageSquare,
-    ChevronLeft
+    ChevronLeft,
+    ThumbsUp
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { useAuth } from "@/hooks/use-auth";
+import CommentSection from "@/components/CommentSection";
+import { ADMIN_TOKEN_KEY } from "@/components/admin/AdminLogin";
 
 export default function BoardPage() {
     const { toast } = useToast();
@@ -34,30 +37,69 @@ export default function BoardPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [showWriteForm, setShowWriteForm] = useState(false);
     const [formData, setFormData] = useState({ title: "", content: "", type: "free" });
-    const [selectedPost, setSelectedPost] = useState<Board | null>(null);
+    const [selectedPost, setSelectedPost] = useState<(Board & { isLiked?: boolean }) | null>(null);
 
-    const { data: posts, isLoading } = useQuery<{ success: boolean; data: Board[] }>({
+    // Verify admin status from server
+    const { data: adminCheck } = useQuery<{ isAdmin: boolean }>({
+        queryKey: ["/api/admin/check"],
+        queryFn: async () => {
+            const token = localStorage.getItem(ADMIN_TOKEN_KEY);
+            if (!token) return { isAdmin: false };
+            const res = await apiRequest("GET", "/api/admin/check", undefined, {
+                headers: { "x-admin-token": token }
+            });
+            return res.json();
+        }
+    });
+
+    const isAdmin = !!adminCheck?.isAdmin;
+
+    const { data: posts, isLoading } = useQuery<{ success: boolean; data: (Board & { isLiked?: boolean })[] }>({
         queryKey: [filter === "all" ? "/api/board" : `/api/board?type=${filter}`],
     });
 
     const mutation = useMutation({
         mutationFn: async (data: any) => {
-            const res = await apiRequest("POST", "/api/board", data);
+            const res = await apiRequest("POST", "/api/admin/board", data, {
+                headers: {
+                    "x-admin-token": localStorage.getItem(ADMIN_TOKEN_KEY) || ""
+                }
+            });
             return res.json();
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["/api/board"] });
             setShowWriteForm(false);
             setFormData({ title: "", content: "", type: "free" });
-            toast({ title: "게시글이 등록되었습니다.", description: "커뮤니티 활동에 감사드립니다!" });
+            toast({ title: "게시글이 등록되었습니다.", description: "관리자 권한으로 게시글이 작성되었습니다." });
+        },
+    });
+
+    const likeMutation = useMutation({
+        mutationFn: async (id: string) => {
+            const res = await apiRequest("POST", `/api/board/${id}/like`);
+            return res.json();
+        },
+        onSuccess: (data, variables) => {
+            queryClient.invalidateQueries({ queryKey: ["/api/board"] });
+            if (selectedPost && data.success) {
+                setSelectedPost(data.data);
+            }
+
+            // 중복 체크 피드백
+            const item = posts?.data?.find(p => p.id === variables);
+            if (item?.isLiked) {
+                toast({ title: "이미 좋아요를 누른 게시글입니다.", description: "관심 가져주셔서 감사합니다!" });
+            } else {
+                toast({ title: "좋아요가 반영되었습니다.", description: "응원해주셔서 감사합니다!" });
+            }
         },
     });
 
     const categories = [
         { id: "all", label: "전체" },
-        { id: "notice", label: "공지사항" },
         { id: "policy", label: "정책소식" },
-        { id: "free", label: "자유게시판" },
+        { id: "activity", label: "활동사진" },
     ];
 
     const filteredPosts = posts?.data?.filter(post =>
@@ -81,12 +123,12 @@ export default function BoardPage() {
             <div className="bg-white px-5 pt-8 pb-6 border-b border-slate-100">
                 <div className="flex justify-between items-center mb-6">
                     <div>
-                        <h2 className="text-[26px] font-black text-primary leading-tight mb-1 tracking-tight">시민 게시판</h2>
+                        <h2 className="text-[26px] font-black text-primary leading-tight mb-1 tracking-tight">공약 게시판</h2>
                         <p className="text-sm text-slate-400 font-medium">소통과 소식이 한자리에</p>
                     </div>
-                    {!showWriteForm && (
+                    {isAdmin && !showWriteForm && (
                         <Button
-                            onClick={() => checkAuthOrLogin(() => setShowWriteForm(true))}
+                            onClick={() => setShowWriteForm(true)}
                             className="bg-primary text-white rounded-2xl h-11 px-6 font-bold shadow-lg shadow-blue-100 flex items-center gap-2"
                         >
                             <Edit3 className="w-4 h-4" /> 글쓰기
@@ -108,7 +150,7 @@ export default function BoardPage() {
             {/* Content Area */}
             <div className="p-5 flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
 
-                {showWriteForm ? (
+                {showWriteForm && isAdmin ? (
                     <Card className="border-none shadow-xl shadow-blue-900/5 rounded-3xl bg-white overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="p-6 space-y-5">
                             <div className="flex justify-between items-center">
@@ -144,7 +186,7 @@ export default function BoardPage() {
                                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                                 />
                                 <Textarea
-                                    placeholder="동탄 시민들과 나누고 싶은 이야기를 적어주세요."
+                                    placeholder="신대지구 주민들과 나누고 싶은 이야기를 적어주세요."
                                     className="min-h-[180px] rounded-xl bg-slate-50 border-none p-4 text-[14px] leading-relaxed resize-none focus:bg-white focus:ring-primary/20"
                                     value={formData.content}
                                     onChange={(e) => setFormData({ ...formData, content: e.target.value })}
@@ -212,10 +254,12 @@ export default function BoardPage() {
                                                             "text-[10px] font-black px-2.5 py-1 rounded-full tracking-wide",
                                                             post.type === 'notice' ? 'bg-red-50 text-red-600' :
                                                                 post.type === 'policy' ? 'bg-blue-50 text-blue-600' :
-                                                                    'bg-slate-100 text-slate-500'
+                                                                    post.type === 'activity' ? 'bg-emerald-50 text-emerald-600' :
+                                                                        'bg-slate-100 text-slate-500'
                                                         )}>
                                                             {post.type === 'notice' ? '공지사항' :
-                                                                post.type === 'policy' ? '정책소식' : '자유게시판'}
+                                                                post.type === 'policy' ? '정책소식' :
+                                                                    post.type === 'activity' ? '활동사진' : '자유게시판'}
                                                         </span>
                                                     </div>
                                                     <div className="flex items-center gap-1.5 text-slate-400 text-[11px] font-medium">
@@ -252,6 +296,19 @@ export default function BoardPage() {
                                                             <MessageSquare className="w-4 h-4 opacity-70" />
                                                             <span className="text-[12px] font-black">0</span>
                                                         </div>
+                                                        <div
+                                                            className={cn(
+                                                                "flex items-center gap-1.5 transition-colors pr-2",
+                                                                post.isLiked ? "text-primary" : "text-slate-400 hover:text-primary"
+                                                            )}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                likeMutation.mutate(post.id);
+                                                            }}
+                                                        >
+                                                            <ThumbsUp className={cn("w-4 h-4 opacity-70", post.isLiked && "fill-current opacity-100")} />
+                                                            <span className="text-[12px] font-black">{post.likeCount}</span>
+                                                        </div>
                                                     </div>
                                                     <div className="text-[11px] font-black text-primary flex items-center gap-0.5">
                                                         자세히 <ChevronRight className="w-3.5 h-3.5" />
@@ -272,7 +329,7 @@ export default function BoardPage() {
                         <div className="p-6 flex flex-col h-full">
                             <div className="flex justify-between items-center mb-6">
                                 <Badge className="bg-primary/5 text-primary border-none font-bold">
-                                    {selectedPost.type === 'notice' ? '공지사항' : selectedPost.type === 'policy' ? '정책소식' : '자유게시판'}
+                                    {selectedPost.type === 'notice' ? '공지사항' : selectedPost.type === 'policy' ? '정책소식' : selectedPost.type === 'activity' ? '활동사진' : '자유게시판'}
                                 </Badge>
                                 <button onClick={() => setSelectedPost(null)} className="p-2 text-slate-400">
                                     <X className="w-6 h-6" />
@@ -290,22 +347,73 @@ export default function BoardPage() {
                                         <Eye className="w-3.5 h-3.5" />
                                         {selectedPost.viewCount}
                                     </div>
+                                    <div className="flex items-center gap-1">
+                                        <ThumbsUp className="w-3.5 h-3.5" />
+                                        {selectedPost.likeCount}
+                                    </div>
                                 </div>
                                 <div className="h-[1px] bg-slate-100" />
 
-                                {selectedPost.imageUrl && (
-                                    <div className="w-full rounded-2xl overflow-hidden shadow-sm">
-                                        <img
-                                            src={selectedPost.imageUrl}
-                                            alt={selectedPost.title}
-                                            className="w-full h-auto object-cover"
-                                        />
+                                {selectedPost.type === 'activity' ? (
+                                    // 활동사진 게시글: 갤러리 뷰로 표시
+                                    <div className="space-y-3">
+                                        {/* 텍스트 내용 (이미지 마크다운 제외) */}
+                                        <p className="text-[15px] text-slate-600 leading-[1.7] whitespace-pre-wrap font-medium">
+                                            {selectedPost.content.replace(/!\[.*?\]\(.*?\)/g, '').trim()}
+                                        </p>
+                                        {/* 이미지 갤러리 */}
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {selectedPost.imageUrl && (
+                                                <div className="rounded-xl overflow-hidden aspect-[4/3]">
+                                                    <img src={selectedPost.imageUrl} alt="활동사진" className="w-full h-full object-cover" />
+                                                </div>
+                                            )}
+                                            {Array.from(selectedPost.content.matchAll(/!\[.*?\]\((\/activity-photos\/[^)]+)\)/g)).map((m, i) => (
+                                                <div key={i} className="rounded-xl overflow-hidden aspect-[4/3]">
+                                                    <img src={m[1]} alt={`활동사진 ${i + 2}`} className="w-full h-full object-cover" />
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
+                                ) : (
+                                    <>
+                                        {selectedPost.imageUrl && (
+                                            <div className="w-full rounded-2xl overflow-hidden shadow-sm">
+                                                <img
+                                                    src={selectedPost.imageUrl}
+                                                    alt={selectedPost.title}
+                                                    className="w-full h-auto object-cover"
+                                                />
+                                            </div>
+                                        )}
+                                        <p className="text-[15px] text-slate-600 leading-[1.7] whitespace-pre-wrap font-medium">
+                                            {selectedPost.content}
+                                        </p>
+                                    </>
                                 )}
 
-                                <p className="text-[15px] text-slate-600 leading-[1.7] whitespace-pre-wrap font-medium">
-                                    {selectedPost.content}
-                                </p>
+                                <div className="flex justify-center py-4">
+                                    <Button
+                                        variant={selectedPost.isLiked ? "default" : "outline"}
+                                        className={cn(
+                                            "rounded-full gap-2 transition-all px-8 h-12",
+                                            selectedPost.isLiked
+                                                ? "bg-primary/10 text-primary border-none hover:bg-primary/20"
+                                                : "border-primary/20 hover:bg-primary/5 hover:text-primary"
+                                        )}
+                                        onClick={() => likeMutation.mutate(selectedPost.id)}
+                                        disabled={likeMutation.isPending}
+                                    >
+                                        <ThumbsUp className={cn("w-5 h-5", selectedPost.isLiked && "fill-current", likeMutation.isPending && "animate-bounce")} />
+                                        <span className="font-bold">
+                                            {selectedPost.isLiked ? "좋아요 완료" : "좋아요"} {selectedPost.likeCount}
+                                        </span>
+                                    </Button>
+                                </div>
+
+                                <div className="h-[1px] bg-slate-100 my-4" />
+
+                                <CommentSection targetType="board" targetId={selectedPost.id} />
                             </div>
                         </div>
                     </Card>

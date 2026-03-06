@@ -28,6 +28,7 @@ import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { useAuth } from "@/hooks/use-auth";
 import { Badge } from "@/components/ui/badge";
+import CommentSection from "@/components/CommentSection";
 
 export default function Suggestions() {
     const { toast } = useToast();
@@ -35,9 +36,9 @@ export default function Suggestions() {
     const [showForm, setShowForm] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [formData, setFormData] = useState({ title: "", content: "", category: "정책제안" });
-    const [selectedSuggestion, setSelectedSuggestion] = useState<Suggestion | null>(null);
+    const [selectedSuggestion, setSelectedSuggestion] = useState<(Suggestion & { maskedIp?: string; isOwner?: boolean; isLiked?: boolean }) | null>(null);
 
-    const { data: suggestions, isLoading } = useQuery<{ success: boolean; data: Suggestion[] }>({
+    const { data: suggestions, isLoading } = useQuery<{ success: boolean; data: (Suggestion & { maskedIp?: string; isOwner?: boolean; isLiked?: boolean })[] }>({
         queryKey: ["/api/suggestions"],
     });
 
@@ -51,6 +52,46 @@ export default function Suggestions() {
             setShowForm(false);
             setFormData({ title: "", content: "", category: "정책제안" });
             toast({ title: "의견이 등록되었습니다.", description: "소중한 의견 감사합니다!" });
+        },
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: async (id: string) => {
+            const res = await apiRequest("DELETE", `/api/suggestions/${id}`);
+            return res.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["/api/suggestions"] });
+            setSelectedSuggestion(null);
+            toast({ title: "의견이 삭제되었습니다." });
+        },
+        onError: (error: any) => {
+            toast({
+                title: "삭제 실패",
+                description: error.message || "삭제 권한이 없거나 오류가 발생했습니다.",
+                variant: "destructive"
+            });
+        }
+    });
+
+    const likeMutation = useMutation({
+        mutationFn: async (id: string) => {
+            const res = await apiRequest("POST", `/api/suggestions/${id}/like`);
+            return res.json();
+        },
+        onSuccess: (data, variables) => {
+            queryClient.invalidateQueries({ queryKey: ["/api/suggestions"] });
+            if (selectedSuggestion && data.success) {
+                setSelectedSuggestion(data.data);
+            }
+
+            // 만약 이미 좋아요를 누른 상태였다면 다른 메시지 표시 (서버에서 체크하지만 클라이언트에서도 피드백)
+            const item = suggestions?.data?.find(s => s.id === variables);
+            if (item?.isLiked) {
+                toast({ title: "이미 공감하신 의견입니다.", description: "많은 참여 감사합니다!" });
+            } else {
+                toast({ title: "공감이 반영되었습니다.", description: "함께해주셔서 감사합니다!" });
+            }
         },
     });
 
@@ -82,13 +123,13 @@ export default function Suggestions() {
                 <div className="relative z-10">
                     <div className="flex justify-between items-center mb-6">
                         <div>
-                            <span className="inline-block px-3 py-1 rounded-full bg-primary/5 text-primary text-[11px] font-black mb-3">CITIZEN VOICE</span>
-                            <h2 className="text-[28px] font-black text-slate-900 leading-tight tracking-tight">시민 의견함</h2>
-                            <p className="text-[14px] text-slate-500 font-medium mt-1">더 살기 좋은 동탄을 위한 제안</p>
+                            <span className="inline-block px-3 py-1 rounded-full bg-primary/5 text-primary text-[11px] font-black mb-3">SINDAE VOICE</span>
+                            <h2 className="text-[28px] font-black text-slate-900 leading-tight tracking-tight">홍성훈의 신대지구 MORE</h2>
+                            <p className="text-[14px] text-slate-500 font-medium mt-1">더 살기 좋은 신대지구를 위한 제안</p>
                         </div>
                         {!showForm && (
                             <Button
-                                onClick={() => checkAuthOrLogin(() => setShowForm(true))}
+                                onClick={() => setShowForm(true)}
                                 className="bg-primary text-white w-12 h-12 rounded-2xl p-0 shadow-lg shadow-blue-100 flex items-center justify-center transition-transform active:scale-95"
                             >
                                 <Plus className="w-6 h-6" />
@@ -117,7 +158,7 @@ export default function Suggestions() {
                                     <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
                                         <Plus className="w-4 h-4 text-primary" />
                                     </div>
-                                    의견 제안하기
+                                    의견 제안하기 <span className="text-[11px] text-primary/50 font-medium ml-1">(익명)</span>
                                 </h3>
                                 <button onClick={() => setShowForm(false)} className="bg-slate-50 p-2 rounded-full text-slate-400 hover:text-slate-600 transition-colors">
                                     <X className="w-5 h-5" />
@@ -143,7 +184,7 @@ export default function Suggestions() {
                                     ))}
                                 </div>
 
-                                <div className="space-y-4 mt-6">
+                                <div className="space-y-4">
                                     <div className="space-y-1.5">
                                         <p className="text-[13px] font-bold text-slate-400 px-1">제목</p>
                                         <Input
@@ -157,12 +198,13 @@ export default function Suggestions() {
                                     <div className="space-y-1.5">
                                         <p className="text-[13px] font-bold text-slate-400 px-1">제안 내용</p>
                                         <Textarea
-                                            placeholder="제안 배경과 구체적인 내용을 적어주세요. 시민들의 공감이 큰 변화를 만듭니다."
+                                            placeholder="제안 배경과 구체적인 내용을 적어주세요. 주민들의 공감이 큰 변화를 만듭니다."
                                             className="min-h-[200px] rounded-2xl bg-slate-50 border-none p-5 text-[14px] font-medium leading-[1.6] resize-none focus:bg-white focus:ring-primary/20 transition-all"
                                             value={formData.content}
                                             onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                                         />
                                     </div>
+                                    <p className="text-[11px] text-slate-400 px-1">* 닉네임과 비밀번호 없이 IP 주소를 기반으로 익명 등록됩니다.</p>
                                 </div>
                             </div>
 
@@ -198,7 +240,7 @@ export default function Suggestions() {
                                 </div>
                             ) : (
                                 filteredSuggestions?.map((item) => (
-                                    <div key={item.id} className="group relative" onClick={() => checkAuthOrLogin(() => setSelectedSuggestion(item))}>
+                                    <div key={item.id} className="group relative" onClick={() => setSelectedSuggestion(item)}>
                                         <Card className="border-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-[28px] bg-white overflow-hidden transition-all duration-300 hover:shadow-[0_20px_40px_rgba(0,0,0,0.08)] hover:-translate-y-1 cursor-pointer">
                                             <CardContent className="p-0">
                                                 {/* Question Section */}
@@ -213,7 +255,10 @@ export default function Suggestions() {
                                                             {item.category.toUpperCase()}
                                                         </span>
                                                         <div className="flex items-center gap-1.5 text-slate-300 text-[11px] font-bold">
-                                                            <Calendar className="w-3.5 h-3.5" />
+                                                            <User className="w-3.5 h-3.5" />
+                                                            {item.maskedIp || "익명"}
+                                                            <span className="mx-1">•</span>
+                                                            <Calendar className="w-3.5 h-3.5 ml-0.5" />
                                                             {format(new Date(item.createdAt), "yyyy.MM.dd")}
                                                         </div>
                                                     </div>
@@ -234,13 +279,25 @@ export default function Suggestions() {
                                                 {/* Action Bar */}
                                                 <div className="bg-slate-50/50 px-6 py-4 flex items-center justify-between border-t border-slate-100/50">
                                                     <div className="flex items-center gap-5">
-                                                        <button className="flex items-center gap-1.5 text-slate-400 hover:text-primary transition-colors">
-                                                            <ThumbsUp className="w-4 h-4" />
+                                                        <button
+                                                            className={cn(
+                                                                "flex items-center gap-1.5 transition-colors",
+                                                                item.isLiked ? "text-primary" : "text-slate-400 hover:text-primary"
+                                                            )}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                likeMutation.mutate(item.id);
+                                                            }}
+                                                        >
+                                                            <ThumbsUp className={cn("w-4 h-4", item.isLiked && "fill-current")} />
                                                             <span className="text-[12px] font-black">{item.likeCount}</span>
                                                         </button>
                                                         <div className="flex items-center gap-1.5 text-slate-400">
                                                             <div className="w-1.5 h-1.5 rounded-full bg-slate-300 animate-pulse"></div>
                                                             <span className="text-[12px] font-bold">검토 중</span>
+                                                            {item.isOwner && (
+                                                                <span className="ml-2 px-1.5 py-0.5 bg-primary/10 text-primary text-[10px] rounded font-black">내 의견</span>
+                                                            )}
                                                         </div>
                                                     </div>
 
@@ -273,15 +330,33 @@ export default function Suggestions() {
                                 )}>
                                     {selectedSuggestion.category}
                                 </Badge>
-                                <button onClick={() => setSelectedSuggestion(null)} className="p-2 text-slate-400">
-                                    <X className="w-6 h-6" />
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    {selectedSuggestion.isOwner && (
+                                        <button
+                                            onClick={() => {
+                                                if (confirm("정말로 이 의견을 삭제하시겠습니까?")) {
+                                                    deleteMutation.mutate(selectedSuggestion.id);
+                                                }
+                                            }}
+                                            className="p-2 text-red-400 hover:text-red-600 transition-colors"
+                                        >
+                                            <X className="w-6 h-6" />
+                                        </button>
+                                    )}
+                                    <button onClick={() => setSelectedSuggestion(null)} className="p-2 text-slate-400">
+                                        <X className="w-6 h-6" />
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="flex-1 overflow-y-auto no-scrollbar space-y-6">
                                 <div className="space-y-3">
                                     <h3 className="text-xl font-black text-slate-900 leading-tight">{selectedSuggestion.title}</h3>
                                     <div className="flex items-center gap-3 text-slate-400 text-xs font-medium">
+                                        <div className="flex items-center gap-1">
+                                            <User className="w-3.5 h-3.5" />
+                                            {selectedSuggestion.maskedIp}
+                                        </div>
                                         <div className="flex items-center gap-1">
                                             <Calendar className="w-3.5 h-3.5" />
                                             {format(new Date(selectedSuggestion.createdAt), "yyyy.MM.dd", { locale: ko })}
@@ -301,20 +376,26 @@ export default function Suggestions() {
                                         </p>
                                     </div>
                                 </div>
+                                <CommentSection targetType="suggestion" targetId={selectedSuggestion.id} />
                             </div>
 
                             <Button
-                                className="w-full h-14 rounded-2xl bg-primary/5 text-primary hover:bg-primary/10 font-black text-[15px] mt-6 flex items-center justify-center gap-2 border-none"
-                                onClick={() => {
-                                    // Like functionality could be added here
-                                    toast({ title: "공감이 표시되었습니다." });
-                                }}
+                                className={cn(
+                                    "w-full h-14 rounded-2xl font-black text-[15px] mt-6 flex items-center justify-center gap-2 border-none shadow-lg shadow-blue-100 transition-all",
+                                    selectedSuggestion.isLiked
+                                        ? "bg-primary/10 text-primary hover:bg-primary/20"
+                                        : "bg-primary text-white hover:bg-primary/90"
+                                )}
+                                onClick={() => likeMutation.mutate(selectedSuggestion.id)}
+                                disabled={likeMutation.isPending}
                             >
-                                <ThumbsUp className="w-4 h-4" /> 저도 이 의견에 공감해요!
+                                <ThumbsUp className={cn("w-4 h-4", selectedSuggestion.isLiked && "fill-current", likeMutation.isPending && "animate-bounce")} />
+                                {selectedSuggestion.isLiked ? "이미 공감한 의견입니다" : "저도 이 의견에 공감해요!"} ({selectedSuggestion.likeCount})
                             </Button>
                         </div>
                     </Card>
                 )}
+
                 {selectedSuggestion && (
                     <div className="fixed inset-0 bg-black/20 z-[55] backdrop-blur-sm" onClick={() => setSelectedSuggestion(null)} />
                 )}

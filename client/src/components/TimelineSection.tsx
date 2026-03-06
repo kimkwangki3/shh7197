@@ -20,7 +20,7 @@ export default function TimelineSection() {
       year: "현재",
       title: "순천 교육 발전 협력 위원",
       organization: "순천 교육 발전 협력 위원회",
-      description: "학부모, 시민단체와 협력하여 청소년 진로 및 교육 환경 개선 활동 추진",
+      description: "학부모, 주민단체와 협력하여 청소년 진로 및 교육 환경 개선 활동 추진",
       image: educationScene
     },
     {

@@ -22,12 +22,22 @@ import fs from "fs";
 import { sql } from "drizzle-orm";
 import { db } from "./db";
 
+declare module "express-session" {
+  interface SessionData {
+    votedSuggestions: string[];
+    votedBoards: string[];
+    votedComments: string[];
+    votedVotes: Record<string, string>;
+  }
+}
+
 // Admin check middleware
 const ADMIN_TOKEN = "shh7197-admin-valid-token";
 
 const isAdmin = (req: Request, res: Response, next: NextFunction) => {
   const token = req.headers["x-admin-token"] as string;
   if (token === ADMIN_TOKEN) {
+    (req as any).isAdmin = true;
     return next();
   }
   console.warn(`Unauthorized admin access attempt. Token: ${token}`);
@@ -55,39 +65,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ isAdmin: false });
   });
 
-
-  app.post("/api/auth/kakao", async (req, res) => {
-    try {
-      const { id, nickname, avatarUrl } = req.body;
-
-      if (!id) {
-        return res.status(400).json({ success: false, message: "카카오 ID가 필요합니다." });
-      }
-
-      let user = await storage.getUserByKakaoId(id.toString());
-
-      if (!user) {
-        user = await storage.createUser({
-          username: `kakao_${id}`,
-          password: "kakao_login",
-          kakaoId: id.toString(),
-          nickname: nickname,
-          avatarUrl: avatarUrl,
-          isAdmin: id.toString() === "3924376517" // Placeholder for specific user to be admin
-        });
-
-        if (req.session) {
-          req.session.user = user;
-        }
-      }
-
-      res.json({ success: true, user });
-    } catch (error) {
-      console.error("Kakao login error:", error);
-      res.status(500).json({ success: false, message: "카카오 로그인 처리 중 오류가 발생했습니다." });
-    }
-  });
-
   app.get("/api/download-project", (_req, res) => {
     const filePath = "/tmp/project-files.tar.gz";
     if (fs.existsSync(filePath)) {
@@ -99,6 +76,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(404).json({ success: false, message: "파일을 찾을 수 없습니다." });
     }
   });
+
   // Contact form endpoint
   app.post("/api/contact", async (req, res) => {
     try {
@@ -508,8 +486,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Vote routes
   app.get("/api/votes", async (req, res) => {
     try {
-      const votes = await storage.getAllVotes();
-      res.json({ success: true, data: votes });
+      const allVotes = await storage.getAllVotes();
+      const clientIp = req.ip || req.socket.remoteAddress || "";
+
+      const mapped = await Promise.all(allVotes.map(async vote => {
+        // DB에서 IP 기반 투표 여부 조회
+        const hasVoted = clientIp ? await storage.hasLiked("vote", vote.id, clientIp) : false;
+        const commentCount = (await storage.getComments("vote", vote.id)).length;
+        return { ...vote, hasVoted, commentCount };
+      }));
+
+      res.json({ success: true, data: mapped });
     } catch (error) {
       res.status(500).json({ success: false, message: "투표 목록을 가져오는데 실패했습니다." });
     }
@@ -533,19 +520,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ success: false, message: "올바른 투표 항목을 선택해주세요." });
       }
 
+      const clientIp = req.ip || req.socket.remoteAddress || "";
+
+      // DB에서 IP 기반 중복 투표 체크
+      if (clientIp) {
+        const alreadyVoted = await storage.hasLiked("vote", id, clientIp);
+        if (alreadyVoted) {
+          return res.status(409).json({ success: false, message: "이미 투표하셨습니다." });
+        }
+      }
+
+      const voteItem = await storage.getVote(id);
+      if (!voteItem) return res.status(404).json({ success: false, message: "투표를 찾을 수 없습니다." });
+
+      if (new Date(voteItem.endDate) < new Date()) {
+        return res.status(400).json({ success: false, message: "종료된 투표입니다." });
+      }
+
       const vote = await storage.updateVoteCount(id, indices);
-      res.json({ success: true, data: vote });
+
+      // DB likes 테이블에 IP 저장 (영구적 중복 방지)
+      if (clientIp) {
+        await storage.createLike({ targetType: "vote", targetId: id, ipAddress: clientIp });
+      }
+
+      const commentCount = (await storage.getComments("vote", id)).length;
+      res.json({ success: true, data: { ...vote, hasVoted: true, commentCount } });
     } catch (error) {
       console.error("Error updating vote:", error);
       res.status(500).json({ success: false, message: "투표 반영에 실패했습니다." });
     }
   });
 
+  // Helper for masking IPs
+  const maskIp = (ip: string | null) => {
+    if (!ip) return "익명";
+    const parts = ip.split('.');
+    return parts.length === 4 ? `${parts[0]}.${parts[1]}.***.***` : ip.slice(0, 8) + '...';
+  };
+
   // Suggestion routes
   app.get("/api/suggestions", async (req, res) => {
     try {
       const suggestions = await storage.getAllSuggestions();
-      res.json({ success: true, data: suggestions });
+      const clientIp = req.ip || req.socket.remoteAddress || "";
+      const isAdminUser = (req.session as any)?.adminId !== undefined;
+
+      const mapped = await Promise.all(suggestions.map(async s => {
+        let isLiked = false;
+        try {
+          if (clientIp) {
+            isLiked = await storage.hasLiked("suggestion", s.id, clientIp);
+          }
+        } catch (e) {
+          console.error(`Error checking like status for suggestion ${s.id}:`, e);
+        }
+
+        return {
+          ...s,
+          maskedIp: maskIp(s.ipAddress),
+          isOwner: s.ipAddress === clientIp || isAdminUser,
+          isLiked
+        };
+      }));
+
+      res.json({ success: true, data: mapped });
     } catch (error) {
       res.status(500).json({ success: false, message: "제안 목록을 가져오는데 실패했습니다." });
     }
@@ -554,7 +593,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/suggestions", async (req, res) => {
     try {
       const data = insertSuggestionSchema.parse(req.body);
-      const suggestion = await storage.createSuggestion(data);
+      const clientIp = req.ip || req.socket.remoteAddress || "";
+      const suggestion = await storage.createSuggestion({
+        ...data,
+        ipAddress: clientIp
+      });
       res.json({ success: true, data: suggestion });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -565,28 +608,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/suggestions/:id/like", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const clientIp = req.ip || req.socket.remoteAddress || "";
+      const updated = await storage.updateSuggestionLikes(id, clientIp);
+      res.json({ success: true, data: updated });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "좋아요 반영에 실패했습니다." });
+    }
+  });
+
+  app.patch("/api/suggestions/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const suggestion = await storage.getSuggestion(id);
+      if (!suggestion) return res.status(404).json({ success: false, message: "의견을 찾을 수 없습니다." });
+
+      const clientIp = req.ip || req.socket.remoteAddress || "";
+      const isAdminUser = (req.session as any)?.adminId !== undefined;
+
+      if (suggestion.ipAddress !== clientIp && !isAdminUser) {
+        return res.status(403).json({ success: false, message: "수정 권한이 없습니다." });
+      }
+
+      const data = insertSuggestionSchema.partial().parse(req.body);
+      const updated = await storage.updateSuggestion(id, data);
+      res.json({ success: true, data: updated });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "의견 수정에 실패했습니다." });
+    }
+  });
+
+  app.delete("/api/suggestions/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const suggestion = await storage.getSuggestion(id);
+      if (!suggestion) return res.status(404).json({ success: false, message: "의견을 찾을 수 없습니다." });
+
+      const clientIp = req.ip || req.socket.remoteAddress || "";
+      const isAdminUser = (req.session as any)?.adminId !== undefined;
+
+      if (suggestion.ipAddress !== clientIp && !isAdminUser) {
+        return res.status(403).json({ success: false, message: "삭제 권한이 없습니다." });
+      }
+
+      await storage.deleteSuggestion(id);
+      res.json({ success: true, message: "의견이 삭제되었습니다." });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "의견 삭제에 실패했습니다." });
+    }
+  });
+
   // Board routes
   app.get("/api/board", async (req, res) => {
     try {
       const { type } = req.query;
       const items = await storage.getBoardItems(type as string);
-      res.json({ success: true, data: items });
+      const clientIp = req.ip || req.socket.remoteAddress || "";
+      const mapped = await Promise.all(items.map(async item => {
+        let isLiked = false;
+        try {
+          if (clientIp) {
+            isLiked = await storage.hasLiked("board", item.id, clientIp);
+          }
+        } catch (e) {
+          console.error(`Error checking like status for board item ${item.id}:`, e);
+        }
+        return { ...item, isLiked };
+      }));
+      res.json({ success: true, data: mapped });
     } catch (error: any) {
       res.status(500).json({ success: false, message: "게시글 목록을 가져오는데 실패했습니다." });
-    }
-  });
-
-  app.post("/api/board", async (req, res) => {
-    try {
-      const data = insertBoardSchema.parse(req.body);
-      const item = await storage.createBoardItem(data);
-      res.json({ success: true, data: item });
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        res.status(400).json({ success: false, errors: error.errors });
-      } else {
-        res.status(500).json({ success: false, message: "게시글 등록에 실패했습니다." });
-      }
     }
   });
 
@@ -594,9 +687,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const item = await storage.getBoardItem(req.params.id);
       if (!item) return res.status(404).json({ success: false, message: "게시글을 찾을 수 없습니다." });
-      res.json({ success: true, data: item });
+
+      const clientIp = req.ip || req.socket.remoteAddress || "";
+      let isLiked = false;
+      try {
+        if (clientIp) {
+          isLiked = await storage.hasLiked("board", item.id, clientIp);
+        }
+      } catch (e) {
+        console.error(`Error checking like status for board item ${item.id}:`, e);
+      }
+      res.json({
+        success: true,
+        data: {
+          ...item,
+          isLiked
+        }
+      });
     } catch (error) {
       res.status(500).json({ success: false, message: "게시글을 가져오는데 실패했습니다." });
+    }
+  });
+
+  app.post("/api/board/:id/like", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const clientIp = req.ip || req.socket.remoteAddress || "";
+      const updated = await storage.updateBoardLikes(id, clientIp);
+      res.json({ success: true, data: updated });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "좋아요 반영에 실패했습니다." });
     }
   });
 
@@ -614,8 +734,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/comments/:targetType/:targetId", async (req: Request, res: Response) => {
     try {
       const { targetType, targetId } = req.params;
-      const comments = await storage.getComments(targetType as string, targetId as string);
-      res.json({ success: true, data: comments });
+      const allComments = await storage.getComments(targetType as string, targetId as string);
+
+      const clientIp = req.ip || req.socket.remoteAddress || "";
+      const isAdminUser = (req.session as any)?.adminId !== undefined;
+
+      const mapped = await Promise.all(allComments.map(async c => {
+        let isLiked = false;
+        try {
+          if (clientIp) {
+            isLiked = await storage.hasLiked("comment", c.id, clientIp);
+          }
+        } catch (e) {
+          console.error(`Error checking like status for comment ${c.id}:`, e);
+        }
+        return {
+          ...c,
+          maskedIp: maskIp(c.ipAddress),
+          isOwner: c.ipAddress === clientIp || isAdminUser,
+          isLiked
+        };
+      }));
+
+      res.json({ success: true, data: mapped });
     } catch (error: any) {
       res.status(500).json({ success: false, message: "댓글 목록을 가져오는데 실패했습니다." });
     }
@@ -624,7 +765,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/comments", async (req: Request, res: Response) => {
     try {
       const data = insertCommentSchema.parse(req.body);
-      const comment = await storage.createComment(data);
+      const clientIp = req.ip || req.socket.remoteAddress || "";
+      const comment = await storage.createComment({
+        ...data,
+        ipAddress: clientIp
+      });
       res.json({ success: true, data: comment });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
@@ -632,6 +777,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         res.status(500).json({ success: false, message: "댓글 등록에 실패했습니다." });
       }
+    }
+  });
+
+  app.delete("/api/comments/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const comment = await storage.getComment(id);
+      if (!comment) return res.status(404).json({ success: false, message: "댓글을 찾을 수 없습니다." });
+
+      const clientIp = req.ip || req.socket.remoteAddress || "";
+      const isAdminUser = (req.session as any)?.adminId !== undefined;
+
+      if (comment.ipAddress !== clientIp && !isAdminUser) {
+        return res.status(403).json({ success: false, message: "삭제 권한이 없습니다." });
+      }
+
+      await storage.deleteComment(id);
+      res.json({ success: true, message: "댓글이 삭제되었습니다." });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "댓글 삭제에 실패했습니다." });
+    }
+  });
+
+  app.post("/api/comments/:id/like", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const clientIp = req.ip || req.socket.remoteAddress || "";
+      const updated = await storage.updateCommentLikes(id, clientIp);
+      res.json({ success: true, data: updated });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "좋아요 반영에 실패했습니다." });
     }
   });
 
@@ -691,7 +867,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         targetType: "suggestion",
         targetId: req.params.id as string,
         content,
-        authorId: "admin",
+        // authorIp is handled automatically in storage
       });
       res.json({ success: true, data: comment });
     } catch (error: any) {

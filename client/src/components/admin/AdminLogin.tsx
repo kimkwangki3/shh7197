@@ -138,7 +138,7 @@ export default function AdminLogin({ onLoginSuccess }: { onLoginSuccess: () => v
 
                         <div className="mt-6 pt-6 border-t border-slate-100 text-center">
                             <p className="text-xs text-slate-400">
-                                &copy; {new Date().getFullYear()} 홍성훈 시민 공동체 제안 플랫폼. All rights reserved.
+                                &copy; {new Date().getFullYear()} 홍성훈 신대지구 공동체 제안 플랫폼. All rights reserved.
                             </p>
                         </div>
                     </CardContent>

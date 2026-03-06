@@ -23,6 +23,10 @@ export default function Home() {
     queryKey: ["/api/suggestions"],
   });
 
+  const { data: boardData, isLoading: boardLoading } = useQuery<{ success: boolean; data: Board[] }>({
+    queryKey: ["/api/board"],
+  });
+
   const ongoingVotes = React.useMemo(() => {
     if (!votesData?.data) return [];
     const now = new Date();
@@ -98,7 +102,7 @@ export default function Home() {
       <section>
         <div className="flex items-center justify-between mb-3 px-1">
           <h2 className="text-lg font-bold flex items-center gap-2">
-            <span className="text-xl">✏️</span> 오늘의 시민 목소리
+            <span className="text-xl">✏️</span> 오늘의 신대지구 목소리
           </h2>
           <Button
             variant="ghost"
@@ -148,40 +152,63 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Hong Seong-hoon TV */}
+      {/* Latest Board Posts - Replacing Hong Seong-hoon TV */}
       <section>
         <div className="flex items-center justify-between mb-3 px-1">
           <h2 className="text-lg font-bold flex items-center gap-2">
-            <span className="text-xl">📺</span> 홍성훈 TV
+            <span className="text-xl">📢</span> 최근 공약게시판
           </h2>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setLocation("/board")}
+            className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1"
+          >
+            더 보기 <ChevronRight className="w-3 h-3" />
+          </Button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          {[1, 2].map(i => (
-            <Card key={i} className="border-none shadow-sm overflow-hidden rounded-2xl group cursor-pointer">
-              <div className="aspect-video bg-muted relative flex items-center justify-center">
-                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors" />
-                <PlayCircle className="w-8 h-8 text-white relative z-10 opacity-80 group-hover:opacity-100 transition-opacity" />
-                {/* 썸네일 이미지 자리 */}
-                <div className="w-full h-full bg-slate-200" />
-              </div>
-              <CardContent className="p-2.5">
-                <h4 className="text-[11px] font-bold line-clamp-2 leading-snug">
-                  [현장속으로] 시민들의 목소리를 직접 들으러 갔습니다 #{i}
-                </h4>
+        <div className="flex flex-col gap-3">
+          {boardLoading ? (
+            [1, 2].map(i => <Skeleton key={i} className="h-24 w-full rounded-2xl" />)
+          ) : boardData?.data && boardData.data.length > 0 ? boardData.data.slice(0, 3).map((item) => (
+            <Card
+              key={item.id}
+              onClick={() => checkAuthOrLogin(() => setLocation(`/board`))}
+              className="border-none shadow-sm hover:shadow-md transition-shadow rounded-2xl bg-white cursor-pointer relative"
+            >
+              <CardContent className="p-4">
+                <div className="flex gap-3">
+                  <div className="flex-1 overflow-hidden">
+                    <h4 className="font-semibold text-sm mb-1 truncate">{item.title}</h4>
+                    <p className="text-xs text-muted-foreground line-clamp-1 mb-2">{item.content}</p>
+                    <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                      <span>{new Date(item.createdAt).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
-          ))}
+          )) : (
+            <Card className="bg-muted/50 border-dashed rounded-2xl h-24 flex items-center justify-center">
+              <p className="text-muted-foreground text-sm">등록된 게시글이 없습니다.</p>
+            </Card>
+          )}
         </div>
       </section>
 
       {/* Floating Action Button */}
-      <Button
-        onClick={() => checkAuthOrLogin(() => setLocation("/suggestions"))}
-        className="fixed bottom-20 right-6 w-14 h-14 rounded-full shadow-lg bg-primary hover:bg-primary/90 p-0 flex items-center justify-center border-none z-40 transition-transform active:scale-95"
-      >
-        <Plus className="w-6 h-6 text-white" />
-      </Button>
+      <div className="fixed bottom-20 right-6 z-40 flex flex-col items-center gap-2 pointer-events-none">
+        <div className="bg-primary text-white text-[13px] font-bold px-3 py-1.5 rounded-full shadow-md whitespace-nowrap">
+          의견제출
+        </div>
+        <Button
+          onClick={() => checkAuthOrLogin(() => setLocation("/suggestions"))}
+          className="w-14 h-14 rounded-full shadow-lg bg-primary hover:bg-primary/90 p-0 flex items-center justify-center border-none transition-transform active:scale-95 pointer-events-auto"
+        >
+          <Plus className="w-6 h-6 text-white" />
+        </Button>
+      </div>
     </div>
   );
 }

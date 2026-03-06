@@ -154,7 +154,8 @@ export const suggestions = pgTable("suggestions", {
   title: text("title").notNull(),
   content: text("content").notNull(),
   category: text("category").notNull(),
-  authorId: varchar("author_id"), // 회원 기능 시 활용
+  authorId: varchar("author_id"), // 관리자 작성 시 'admin' 등
+  ipAddress: text("ip_address"), // 작성자 IP (익명 식별용)
   likeCount: integer("like_count").notNull().default(0),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
@@ -193,9 +194,24 @@ export const comments = pgTable("comments", {
   targetType: text("target_type").notNull(), // vote, suggestion, board
   targetId: varchar("target_id").notNull(),
   content: text("content").notNull(),
-  authorId: varchar("author_id"),
+  authorId: varchar("author_id"), // 관리자 작성 시 'admin' 등
+  ipAddress: text("ip_address"), // 작성자 IP (익명 식별용)
   likeCount: integer("like_count").notNull().default(0),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// 좋아요 이력 (IP 기반 중복 방지용)
+export const likes = pgTable("likes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  targetType: text("target_type").notNull(), // board, comment, suggestion
+  targetId: varchar("target_id").notNull(),
+  ipAddress: text("ip_address").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertLikeSchema = createInsertSchema(likes).omit({
+  id: true,
+  createdAt: true,
 });
 
 // Insert schemas
@@ -253,6 +269,10 @@ export const insertVoteSchema = createInsertSchema(votes).omit({
 export const insertSuggestionSchema = createInsertSchema(suggestions).omit({
   id: true,
   createdAt: true,
+}).extend({
+  title: z.string().min(1, "제목을 입력해주세요"),
+  content: z.string().min(1, "내용을 입력해주세요"),
+  ipAddress: z.string().optional(),
 });
 
 export const insertBoardSchema = createInsertSchema(boards).omit({
@@ -277,6 +297,9 @@ export const insertPromiseSchema = createInsertSchema(promises).omit({
 export const insertCommentSchema = createInsertSchema(comments).omit({
   id: true,
   createdAt: true,
+}).extend({
+  content: z.string().min(1, "내용을 입력해주세요"),
+  ipAddress: z.string().optional(),
 });
 
 // Types
@@ -310,3 +333,5 @@ export type PromiseItem = typeof promises.$inferSelect;
 export type InsertPromise = z.infer<typeof insertPromiseSchema>;
 export type Comment = typeof comments.$inferSelect;
 export type InsertComment = z.infer<typeof insertCommentSchema>;
+export type Like = typeof likes.$inferSelect;
+export type InsertLike = z.infer<typeof insertLikeSchema>;

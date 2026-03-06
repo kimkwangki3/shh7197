@@ -3,6 +3,9 @@ import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { Home, CheckSquare, Lightbulb, ClipboardList, BookOpen, User, Bell, Menu, LogOut, ShieldCheck } from "lucide-react";
 import KakaoLogin from "@/components/KakaoLogin";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { ADMIN_TOKEN_KEY } from "@/components/admin/AdminLogin";
 
 interface LayoutProps {
     children: ReactNode;
@@ -11,21 +14,44 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
     const [location] = useLocation();
 
-    const navItems = [
-        { href: "/", label: "홈", icon: Home },
-        { href: "/votes", label: "투표소", icon: CheckSquare },
-        { href: "/suggestions", label: "의견", icon: Lightbulb },
-        { href: "/board", label: "게시판", icon: ClipboardList },
-        { href: "/promises", label: "공약", icon: BookOpen },
-        { href: "/profile", label: "홍성훈", icon: User },
-    ];
+    // Verify admin status from server
+    const { data: adminCheck } = useQuery<{ isAdmin: boolean }>({
+        queryKey: ["/api/admin/check"],
+        queryFn: async () => {
+            const token = localStorage.getItem(ADMIN_TOKEN_KEY);
+            if (!token) return { isAdmin: false };
+            const res = await apiRequest("GET", "/api/admin/check", undefined, {
+                headers: { "x-admin-token": token }
+            });
+            return res.json();
+        }
+    });
+
+    const isAdmin = !!adminCheck?.isAdmin;
 
     const userString = localStorage.getItem("user");
     const user = userString ? JSON.parse(userString) : null;
 
+    const navItems = [
+        { href: "/", label: "홈", icon: Home },
+        { href: "/votes", label: "투표소", icon: CheckSquare },
+        { href: "/suggestions", label: "의견", icon: Lightbulb },
+        { href: "/board", label: "공약 게시판", icon: ClipboardList },
+        ...(user?.isAdmin ? [{ href: "/promises", label: "공약", icon: BookOpen }] : []),
+        { href: "/profile", label: "홍성훈", icon: User },
+    ];
+
     const handleLogout = () => {
         localStorage.removeItem("user");
         window.location.reload();
+    };
+
+    const handleAdminLogout = () => {
+        if (confirm("관리자 모드를 종료하시겠습니까?")) {
+            localStorage.removeItem(ADMIN_TOKEN_KEY);
+            queryClient.invalidateQueries({ queryKey: ["/api/admin/check"] });
+            window.location.reload();
+        }
     };
 
     return (
@@ -39,27 +65,24 @@ export default function Layout({ children }: LayoutProps) {
                         <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center overflow-hidden">
                             <img src="/images/candidate.png" alt="Candidate" className="w-full h-full object-cover" />
                         </div>
-                        <h1 className="text-white font-bold text-lg">홍성훈</h1>
-                        <span className="text-white/80 text-xs hidden sm:inline">신대지구 주민 참여 플랫폼</span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                            <h1 className="text-white font-bold text-lg flex items-center gap-1.5 tracking-tight">
+                                홍성훈의 신대지구 <span className="text-[11px] bg-white text-primary px-2 py-0.5 rounded-full font-black leading-none pb-px italic">MORE</span>
+                            </h1>
+                            {isAdmin && (
+                                <button
+                                    onClick={handleAdminLogout}
+                                    className="flex items-center gap-1 bg-amber-400 text-white px-2 py-0.5 rounded-full shadow-sm animate-in fade-in zoom-in-95 duration-300 hover:bg-amber-500 transition-colors cursor-pointer"
+                                    title="관리자 로그아웃"
+                                >
+                                    <ShieldCheck className="w-3 h-3 fill-current" />
+                                    <span className="text-[10px] font-black tracking-tighter uppercase">Admin</span>
+                                </button>
+                            )}
+                        </div>
                     </div>
                     <div className="flex items-center gap-3">
-                        {user && (
-                            <div className="flex items-center gap-3">
-                                {user.avatarUrl && (
-                                    <img src={user.avatarUrl} alt={user.nickname} className="w-8 h-8 rounded-full border-2 border-white/20" />
-                                )}
-                                {user.isAdmin && (
-                                    <Link href="/admin">
-                                        <button className="text-white p-2 hover:bg-white/10 rounded-full transition-colors" title="관리자 페이지">
-                                            <ShieldCheck className="w-5 h-5" />
-                                        </button>
-                                    </Link>
-                                )}
-                                <button onClick={handleLogout} className="text-white p-2 hover:bg-white/10 rounded-full transition-colors">
-                                    <LogOut className="w-5 h-5" />
-                                </button>
-                            </div>
-                        )}
+
                         <button className="text-white p-2 hover:bg-white/10 rounded-full transition-colors">
                             <Menu className="w-6 h-6" />
                         </button>

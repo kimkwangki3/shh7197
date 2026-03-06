@@ -1,10 +1,31 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import session from "express-session";
+import connectPg from "connect-pg-simple";
+import { pool } from "./db";
+
+const PostgresStore = connectPg(session);
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+app.use(
+  session({
+    store: new PostgresStore({
+      pool: pool,
+      createTableIfMissing: true,
+    }),
+    secret: process.env.SESSION_SECRET || "shh7197-session-secret",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      secure: app.get("env") === "production",
+    },
+  })
+);
 
 app.use((req, res, next) => {
   const start = Date.now();

@@ -16,19 +16,6 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Noto+Sans+KR:wght@100..900&display=swap"
     rel="stylesheet">
-  <script src="https://t1.kakaocdn.net/kakao_js_sdk/1.43.0/kakao.min.js"></script>
-  <script>
-    // 카카오 SDK 초기화
-    function initKakao() {
-      if (window.Kakao && !window.Kakao.isInitialized()) {
-        window.Kakao.init('9c016096164155750e7d5adc6e17d4da');
-        console.log('Kakao SDK Initialized');
-      }
-    }
-    // 페이지 로드 시 및 즉시 시도
-    window.addEventListener('load', initKakao);
-    setTimeout(initKakao, 1000); 
-  </script>
 </head>
 
 <body>

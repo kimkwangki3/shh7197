@@ -1,19 +1,14 @@
 import React, { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Vote as VoteType } from "@shared/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-    ThumbsUp,
-    ThumbsDown,
     BarChart3,
     Users,
     Calendar,
-    ChevronRight,
     MessageCircle,
     Share2,
     CheckCircle2,
@@ -23,18 +18,32 @@ import {
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
-import { useAuth } from "@/hooks/use-auth";
-
 import { useSearch } from "wouter";
+import CommentSection from "@/components/CommentSection";
+
+interface VoteItem {
+    id: string;
+    title: string;
+    description: string;
+    category: string;
+    endDate: string;
+    options: string[];
+    results: number[];
+    allowMultiple: boolean;
+    isHero: boolean;
+    hasVoted: boolean;
+    commentCount: number;
+    createdAt: string;
+    updatedAt: string;
+}
 
 export default function Vote() {
-    const { checkAuthOrLogin } = useAuth();
     const { toast } = useToast();
     const search = useSearch();
-    const [votedIds, setVotedIds] = useState<number[]>([]);
     const [activeTab, setActiveTab] = useState<'ongoing' | 'ended'>('ongoing');
+    const [openCommentId, setOpenCommentId] = useState<string | null>(null);
 
-    const { data: votes, isLoading } = useQuery<{ success: boolean; data: VoteType[] }>({
+    const { data: votes, isLoading } = useQuery<{ success: boolean; data: VoteItem[] }>({
         queryKey: ["/api/votes"],
     });
 
@@ -46,8 +55,6 @@ export default function Vote() {
             if (targetVote) {
                 const isEnded = new Date(targetVote.endDate) < new Date();
                 setActiveTab(isEnded ? 'ended' : 'ongoing');
-
-                // Optional: Scroll to the element after a short delay
                 setTimeout(() => {
                     const el = document.getElementById(`vote-${id}`);
                     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -57,22 +64,29 @@ export default function Vote() {
     }, [search, votes?.data]);
 
     const mutation = useMutation({
-        mutationFn: async ({ id, optionIndex }: { id: number; optionIndex: number }) => {
-            const res = await apiRequest("POST", `/api/votes/${id}/vote`, { optionIndices: [optionIndex] });
+        mutationFn: async ({ id, optionIndex }: { id: string; optionIndex: number }) => {
+            const res = await apiRequest("POST", `/api/votes/${id}/vote`, { indices: [optionIndex] });
             return res.json();
         },
-        onSuccess: (data, variables) => {
+        onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["/api/votes"] });
-            setVotedIds([...votedIds, variables.id]);
             toast({
-                title: "투표가 완료되었습니다.",
+                title: "✅ 투표가 완료되었습니다.",
                 description: "소중한 의견 감사합니다!",
             });
         },
+        onError: (err: Error) => {
+            toast({
+                title: "투표 실패",
+                description: err.message,
+                variant: "destructive"
+            });
+        }
     });
 
-    const handleVote = (id: number, optionIndex: number) => {
-        if (votedIds.includes(id)) {
+    const handleVote = (id: string, optionIndex: number) => {
+        const vote = votes?.data?.find(v => v.id === id);
+        if (vote?.hasVoted) {
             toast({
                 title: "이미 참여하셨습니다.",
                 description: "이 주제에 이미 투표하셨습니다.",
@@ -83,10 +97,28 @@ export default function Vote() {
         mutation.mutate({ id, optionIndex });
     };
 
+    const handleShare = (item: VoteItem) => {
+        const url = `${window.location.origin}${window.location.pathname}?id=${item.id}`;
+        if (navigator.share) {
+            navigator.share({
+                title: item.title,
+                text: item.description,
+                url,
+            }).catch(() => { });
+        } else {
+            navigator.clipboard.writeText(url).then(() => {
+                toast({
+                    title: "🔗 링크가 복사되었습니다!",
+                    description: "공유 링크를 클립보드에 복사했습니다.",
+                });
+            });
+        }
+    };
+
     const filteredVotes = React.useMemo(() => {
         if (!votes?.data) return [];
         const now = new Date();
-        return votes.data.filter((vote: VoteType) => {
+        return votes.data.filter((vote: VoteItem) => {
             const isEnded = new Date(vote.endDate) < now;
             return activeTab === 'ongoing' ? !isEnded : isEnded;
         });
@@ -112,11 +144,11 @@ export default function Vote() {
 
                 <div className="relative z-10 text-center">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/5 text-primary text-[11px] font-black mb-4">
-                        <Users className="w-3.5 h-3.5" /> 실시간 시민 투표소
+                        <Users className="w-3.5 h-3.5" /> 실시간 신대지구 투표소
                     </div>
                     <h2 className="text-[28px] font-black text-slate-900 leading-tight tracking-tight mb-2">당신의 의견을 들려주세요</h2>
                     <p className="text-[14px] text-slate-500 font-medium max-w-[280px] mx-auto">
-                        동탄의 정책, 시민의 손으로 직접 결정합니다.
+                        신대지구의 정책, 우리 손으로 직접 결정합니다.
                     </p>
                 </div>
             </div>
@@ -167,8 +199,9 @@ export default function Vote() {
                         const results = item.results || [];
                         const options = item.options || [];
                         const total = results.reduce((acc, curr) => acc + curr, 0);
-                        const isVoted = votedIds.includes(item.id);
+                        const isVoted = item.hasVoted;
                         const isEnded = new Date(item.endDate) < new Date();
+                        const isCommentOpen = openCommentId === item.id;
 
                         return (
                             <Card key={item.id} id={`vote-${item.id}`} className={cn(
@@ -213,9 +246,9 @@ export default function Vote() {
                                                         <div
                                                             className={cn(
                                                                 "relative h-12 w-full bg-slate-50 rounded-2xl overflow-hidden group",
-                                                                !isEnded && !isVoted && "cursor-pointer active:scale-[0.98] transition-transform"
+                                                                !isEnded && !isVoted && !mutation.isPending && "cursor-pointer active:scale-[0.98] transition-transform"
                                                             )}
-                                                            onClick={() => !isEnded && !isVoted && handleVote(item.id, idx)}
+                                                            onClick={() => !isEnded && !isVoted && !mutation.isPending && handleVote(item.id, idx)}
                                                         >
                                                             <div
                                                                 className={cn(
@@ -232,13 +265,17 @@ export default function Vote() {
                                                                 )}>
                                                                     {option}
                                                                 </span>
+                                                                {!isEnded && !isVoted && (
+                                                                    <span className="text-[11px] font-bold text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                        클릭하여 투표
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </div>
                                                 );
                                             })}
                                         </div>
-
 
                                         {(isVoted || isEnded) && (
                                             <p className="text-center text-[12px] font-bold text-slate-400 mt-4 flex items-center justify-center gap-1.5 animate-in fade-in slide-in-from-top-1">
@@ -258,15 +295,37 @@ export default function Vote() {
                                                 <Users className="w-4 h-4" />
                                                 <span className="text-[12px] font-black">{total.toLocaleString()}명 참여</span>
                                             </div>
-                                            <div className="flex items-center gap-1.5 text-slate-400">
+                                            <button
+                                                onClick={() => setOpenCommentId(isCommentOpen ? null : item.id)}
+                                                className={cn(
+                                                    "flex items-center gap-1.5 transition-colors",
+                                                    isCommentOpen ? "text-primary" : "text-slate-400 hover:text-primary"
+                                                )}
+                                            >
                                                 <MessageCircle className="w-4 h-4" />
-                                                <span className="text-[12px] font-black">의견 나눔</span>
-                                            </div>
+                                                <span className="text-[12px] font-black">
+                                                    의견나눔 {item.commentCount > 0 && <span className="text-primary">({item.commentCount})</span>}
+                                                </span>
+                                            </button>
                                         </div>
-                                        <button className="text-slate-400 hover:text-primary transition-colors">
+                                        <button
+                                            onClick={() => handleShare(item)}
+                                            className="text-slate-400 hover:text-primary transition-colors"
+                                            title="공유하기"
+                                        >
                                             <Share2 className="w-5 h-5" />
                                         </button>
                                     </div>
+
+                                    {/* Comment Section (expandable) */}
+                                    {isCommentOpen && (
+                                        <div className="px-8 py-4 border-t border-slate-100 animate-in fade-in slide-in-from-top-2 duration-200">
+                                            <CommentSection
+                                                targetType="vote"
+                                                targetId={item.id}
+                                            />
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         );
@@ -281,7 +340,7 @@ export default function Vote() {
                     <div>
                         <h4 className="text-[14px] font-black text-slate-800 mb-1">투표 안내사항</h4>
                         <p className="text-[12px] text-slate-500 font-medium leading-relaxed">
-                            본 투표는 동탄 시민의 의견을 수렴하기 위한 참고용이며, 중복 투표는 불가능합니다. 투명한 참여 문화를 만들어주세요.
+                            본 투표는 신대지구 주민의 의견을 수렴하기 위한 참고용이며, 중복 투표는 불가능합니다. 투명한 참여 문화를 만들어주세요.
                         </p>
                     </div>
                 </div>

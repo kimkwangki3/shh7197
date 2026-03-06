@@ -80,20 +80,32 @@ export default function Suggestions() {
             return res.json();
         },
         onSuccess: (data, variables) => {
+            localStorage.setItem(`liked_suggestion_${variables}`, 'true');
             queryClient.invalidateQueries({ queryKey: ["/api/suggestions"] });
-            if (selectedSuggestion && data.success) {
-                setSelectedSuggestion(data.data);
-            }
 
-            // 만약 이미 좋아요를 누른 상태였다면 다른 메시지 표시 (서버에서 체크하지만 클라이언트에서도 피드백)
+            // 중복 체크 피드백
             const item = suggestions?.data?.find(s => s.id === variables);
             if (item?.isLiked) {
-                toast({ title: "이미 공감하신 의견입니다.", description: "많은 참여 감사합니다!" });
+                toast({ title: "이미 공감하신 의견입니다." });
             } else {
-                toast({ title: "공감이 반영되었습니다.", description: "함께해주셔서 감사합니다!" });
+                toast({ title: "공감이 반영되었습니다." });
             }
         },
     });
+
+    const handleLike = (id: string) => {
+        if (likeMutation.isPending) return;
+
+        const isLikedLocal = localStorage.getItem(`liked_suggestion_${id}`);
+        const suggestion = suggestions?.data?.find(s => s.id === id);
+
+        if (suggestion?.isLiked || isLikedLocal) {
+            toast({ title: "이미 공감하신 의견입니다." });
+            return;
+        }
+
+        likeMutation.mutate(id);
+    };
 
     const categories = ["정책제안", "민원/건의", "궁금해요", "기타"];
 
@@ -286,7 +298,7 @@ export default function Suggestions() {
                                                             )}
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                likeMutation.mutate(item.id);
+                                                                handleLike(item.id);
                                                             }}
                                                         >
                                                             <ThumbsUp className={cn("w-4 h-4", item.isLiked && "fill-current")} />

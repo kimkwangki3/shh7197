@@ -44,6 +44,16 @@ const isAdmin = (req: Request, res: Response, next: NextFunction) => {
   res.status(401).json({ success: false, message: "관리자 권한이 필요합니다." });
 };
 
+// Helper to get real client IP, especially behind proxies like Render/Nginx
+const getClientIp = (req: any) => {
+  const forwarded = req.headers["x-forwarded-for"];
+  const ip = (
+    (typeof forwarded === "string" ? forwarded.split(",")[0] : req.ip) ||
+    req.socket.remoteAddress || ""
+  ).trim();
+  return ip;
+};
+
 export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/login", async (req: Request, res: Response) => {
     const { username, password } = req.body;
@@ -488,13 +498,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const allVotes = await storage.getAllVotes();
 
-      const forwarded = req.headers["x-forwarded-for"];
-      const clientIp = (
-        (typeof forwarded === "string" ? forwarded.split(",")[0].trim() : null) ||
-        req.ip ||
-        req.socket.remoteAddress ||
-        ""
-      );
+      const clientIp = getClientIp(req);
 
       const mapped = await Promise.all(allVotes.map(async vote => {
         // DB에서 IP 기반 투표 여부 조회
@@ -528,13 +532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // X-Forwarded-For → req.ip → socket 순으로 실제 IP 추출
-      const forwarded = req.headers["x-forwarded-for"];
-      const clientIp = (
-        (typeof forwarded === "string" ? forwarded.split(",")[0].trim() : null) ||
-        req.ip ||
-        req.socket.remoteAddress ||
-        ""
-      );
+      const clientIp = getClientIp(req);
 
       // 1차 방어: 세션 기반 (같은 브라우저 중복 방지)
       if (!req.session.votedVotes) req.session.votedVotes = {};
@@ -585,7 +583,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/suggestions", async (req, res) => {
     try {
       const suggestions = await storage.getAllSuggestions();
-      const clientIp = req.ip || req.socket.remoteAddress || "";
+      const clientIp = getClientIp(req);
       const isAdminUser = (req.session as any)?.adminId !== undefined;
 
       const mapped = await Promise.all(suggestions.map(async s => {
@@ -615,7 +613,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/suggestions", async (req, res) => {
     try {
       const data = insertSuggestionSchema.parse(req.body);
-      const clientIp = req.ip || req.socket.remoteAddress || "";
+      const clientIp = getClientIp(req);
       const suggestion = await storage.createSuggestion({
         ...data,
         ipAddress: clientIp
@@ -633,7 +631,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/suggestions/:id/like", async (req, res) => {
     try {
       const { id } = req.params;
-      const clientIp = req.ip || req.socket.remoteAddress || "";
+      const clientIp = getClientIp(req);
       const updated = await storage.updateSuggestionLikes(id, clientIp);
       res.json({ success: true, data: updated });
     } catch (error) {
@@ -647,7 +645,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const suggestion = await storage.getSuggestion(id);
       if (!suggestion) return res.status(404).json({ success: false, message: "의견을 찾을 수 없습니다." });
 
-      const clientIp = req.ip || req.socket.remoteAddress || "";
+      const clientIp = getClientIp(req);
       const isAdminUser = (req.session as any)?.adminId !== undefined;
 
       if (suggestion.ipAddress !== clientIp && !isAdminUser) {
@@ -668,7 +666,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const suggestion = await storage.getSuggestion(id);
       if (!suggestion) return res.status(404).json({ success: false, message: "의견을 찾을 수 없습니다." });
 
-      const clientIp = req.ip || req.socket.remoteAddress || "";
+      const clientIp = getClientIp(req);
       const isAdminUser = (req.session as any)?.adminId !== undefined;
 
       if (suggestion.ipAddress !== clientIp && !isAdminUser) {
@@ -687,7 +685,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { type } = req.query;
       const items = await storage.getBoardItems(type as string);
-      const clientIp = req.ip || req.socket.remoteAddress || "";
+      const clientIp = getClientIp(req);
       const mapped = await Promise.all(items.map(async item => {
         let isLiked = false;
         try {
@@ -710,7 +708,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const item = await storage.getBoardItem(req.params.id);
       if (!item) return res.status(404).json({ success: false, message: "게시글을 찾을 수 없습니다." });
 
-      const clientIp = req.ip || req.socket.remoteAddress || "";
+      const clientIp = getClientIp(req);
       let isLiked = false;
       try {
         if (clientIp) {
@@ -734,7 +732,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/board/:id/like", async (req, res) => {
     try {
       const { id } = req.params;
-      const clientIp = req.ip || req.socket.remoteAddress || "";
+      const clientIp = getClientIp(req);
       const updated = await storage.updateBoardLikes(id, clientIp);
       res.json({ success: true, data: updated });
     } catch (error) {
@@ -758,7 +756,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { targetType, targetId } = req.params;
       const allComments = await storage.getComments(targetType as string, targetId as string);
 
-      const clientIp = req.ip || req.socket.remoteAddress || "";
+      const clientIp = getClientIp(req);
       const isAdminUser = (req.session as any)?.adminId !== undefined;
 
       const mapped = await Promise.all(allComments.map(async c => {
@@ -787,7 +785,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/comments", async (req: Request, res: Response) => {
     try {
       const data = insertCommentSchema.parse(req.body);
-      const clientIp = req.ip || req.socket.remoteAddress || "";
+      const clientIp = getClientIp(req);
       const comment = await storage.createComment({
         ...data,
         ipAddress: clientIp
@@ -808,7 +806,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const comment = await storage.getComment(id);
       if (!comment) return res.status(404).json({ success: false, message: "댓글을 찾을 수 없습니다." });
 
-      const clientIp = req.ip || req.socket.remoteAddress || "";
+      const clientIp = getClientIp(req);
       const isAdminUser = (req.session as any)?.adminId !== undefined;
 
       if (comment.ipAddress !== clientIp && !isAdminUser) {
@@ -825,7 +823,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/comments/:id/like", async (req, res) => {
     try {
       const { id } = req.params;
-      const clientIp = req.ip || req.socket.remoteAddress || "";
+      const clientIp = getClientIp(req);
       const updated = await storage.updateCommentLikes(id, clientIp);
       res.json({ success: true, data: updated });
     } catch (error) {

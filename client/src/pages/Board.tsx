@@ -81,6 +81,7 @@ export default function BoardPage() {
             return res.json();
         },
         onSuccess: (data, variables) => {
+            localStorage.setItem(`liked_board_${variables}`, 'true');
             queryClient.invalidateQueries({ queryKey: ["/api/board"] });
             if (selectedPost && data.success) {
                 setSelectedPost(data.data);
@@ -89,12 +90,26 @@ export default function BoardPage() {
             // 중복 체크 피드백
             const item = posts?.data?.find(p => p.id === variables);
             if (item?.isLiked) {
-                toast({ title: "이미 좋아요를 누른 게시글입니다.", description: "관심 가져주셔서 감사합니다!" });
+                toast({ title: "이미 공감하신 게시글입니다." });
             } else {
-                toast({ title: "좋아요가 반영되었습니다.", description: "응원해주셔서 감사합니다!" });
+                toast({ title: "공감이 반영되었습니다." });
             }
         },
     });
+
+    const handleLike = (id: string) => {
+        if (likeMutation.isPending) return;
+
+        const isLikedLocal = localStorage.getItem(`liked_board_${id}`);
+        const post = posts?.data?.find(p => p.id === id);
+
+        if (post?.isLiked || isLikedLocal) {
+            toast({ title: "이미 공감하신 게시글입니다." });
+            return;
+        }
+
+        likeMutation.mutate(id);
+    };
 
     const categories = [
         { id: "all", label: "전체" },
@@ -299,14 +314,14 @@ export default function BoardPage() {
                                                         <div
                                                             className={cn(
                                                                 "flex items-center gap-1.5 transition-colors pr-2",
-                                                                post.isLiked ? "text-primary" : "text-slate-400 hover:text-primary"
+                                                                post.isLiked || localStorage.getItem(`liked_board_${post.id}`) ? "text-primary" : "text-slate-400 hover:text-primary"
                                                             )}
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                likeMutation.mutate(post.id);
+                                                                handleLike(post.id);
                                                             }}
                                                         >
-                                                            <ThumbsUp className={cn("w-4 h-4 opacity-70", post.isLiked && "fill-current opacity-100")} />
+                                                            <ThumbsUp className={cn("w-4 h-4 opacity-70", (post.isLiked || localStorage.getItem(`liked_board_${post.id}`)) && "fill-current opacity-100")} />
                                                             <span className="text-[12px] font-black">{post.likeCount}</span>
                                                         </div>
                                                     </div>

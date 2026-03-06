@@ -66,6 +66,7 @@ export default function CommentSection({ targetType, targetId }: CommentSectionP
             return res.json();
         },
         onSuccess: (data, variables) => {
+            localStorage.setItem(`liked_comment_${variables}`, 'true');
             queryClient.invalidateQueries({ queryKey: [`/api/comments/${targetType}/${targetId}`] });
 
             // 중복 체크 피드백
@@ -77,6 +78,20 @@ export default function CommentSection({ targetType, targetId }: CommentSectionP
             }
         },
     });
+
+    const handleLike = (id: string) => {
+        if (likeMutation.isPending) return;
+
+        const isLikedLocal = localStorage.getItem(`liked_comment_${id}`);
+        const comment = comments?.data?.find(c => c.id === id);
+
+        if (comment?.isLiked || isLikedLocal) {
+            toast({ title: "이미 공감하신 댓글입니다." });
+            return;
+        }
+
+        likeMutation.mutate(id);
+    };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -151,13 +166,14 @@ export default function CommentSection({ targetType, targetId }: CommentSectionP
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <button
-                                            onClick={() => likeMutation.mutate(comment.id)}
+                                            onClick={() => handleLike(comment.id)}
+                                            disabled={likeMutation.isPending}
                                             className={cn(
                                                 "flex items-center gap-1 text-[11px] font-bold transition-colors",
-                                                comment.isLiked ? "text-primary" : "text-slate-400 hover:text-primary"
+                                                (comment.isLiked || localStorage.getItem(`liked_comment_${comment.id}`)) ? "text-primary" : "text-slate-400 hover:text-primary"
                                             )}
                                         >
-                                            <ThumbsUp className={cn("w-3 h-3", comment.isLiked && "fill-current")} />
+                                            <ThumbsUp className={cn("w-3 h-3", (comment.isLiked || localStorage.getItem(`liked_comment_${comment.id}`)) && "fill-current")} />
                                             {comment.likeCount || 0}
                                         </button>
                                         {comment.isOwner && (

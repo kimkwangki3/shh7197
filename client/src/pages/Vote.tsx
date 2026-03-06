@@ -94,6 +94,13 @@ export default function Vote() {
             });
             return;
         }
+
+        // 실수 투표 방지를 위한 확인 절차 추가
+        const optionName = vote?.options[optionIndex];
+        if (!window.confirm(`'${optionName}' 항목에 투표하시겠습니까?`)) {
+            return;
+        }
+
         mutation.mutate({ id, optionIndex });
     };
 

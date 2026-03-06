@@ -487,7 +487,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/votes", async (req, res) => {
     try {
       const allVotes = await storage.getAllVotes();
-      const clientIp = req.ip || req.socket.remoteAddress || "";
+
+      const forwarded = req.headers["x-forwarded-for"];
+      const clientIp = (
+        (typeof forwarded === "string" ? forwarded.split(",")[0].trim() : null) ||
+        req.ip ||
+        req.socket.remoteAddress ||
+        ""
+      );
 
       const mapped = await Promise.all(allVotes.map(async vote => {
         // DB에서 IP 기반 투표 여부 조회
@@ -520,12 +527,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ success: false, message: "올바른 투표 항목을 선택해주세요." });
       }
 
-      const clientIp = req.ip || req.socket.remoteAddress || "";
+      // X-Forwarded-For → req.ip → socket 순으로 실제 IP 추출
+      const forwarded = req.headers["x-forwarded-for"];
+      const clientIp = (
+        (typeof forwarded === "string" ? forwarded.split(",")[0].trim() : null) ||
+        req.ip ||
+        req.socket.remoteAddress ||
+        ""
+      );
 
-      // DB에서 IP 기반 중복 투표 체크
+      // 1차 방어: 세션 기반 (같은 브라우저 중복 방지)
+      if (!req.session.votedVotes) req.session.votedVotes = {};
+      if (req.session.votedVotes[id]) {
+        return res.status(409).json({ success: false, message: "이미 투표하셨습니다." });
+      }
+
+      // 2차 방어: DB IP 기반 (다른 브라우저/시크릿 모드 중복 방지)
       if (clientIp) {
         const alreadyVoted = await storage.hasLiked("vote", id, clientIp);
         if (alreadyVoted) {
+          req.session.votedVotes[id] = clientIp;
           return res.status(409).json({ success: false, message: "이미 투표하셨습니다." });
         }
       }
@@ -539,7 +560,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const vote = await storage.updateVoteCount(id, indices);
 
-      // DB likes 테이블에 IP 저장 (영구적 중복 방지)
+      // 세션 + DB 양쪽에 기록
+      req.session.votedVotes[id] = clientIp || "voted";
       if (clientIp) {
         await storage.createLike({ targetType: "vote", targetId: id, ipAddress: clientIp });
       }

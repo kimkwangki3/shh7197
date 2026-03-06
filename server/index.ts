@@ -8,6 +8,7 @@ import { pool } from "./db";
 const PostgresStore = connectPg(session);
 
 const app = express();
+app.set('trust proxy', 1); // Render/Nginx 프록시 뒤에서 실제 클라이언트 IP 감지
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 

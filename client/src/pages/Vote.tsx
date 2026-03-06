@@ -68,7 +68,8 @@ export default function Vote() {
             const res = await apiRequest("POST", `/api/votes/${id}/vote`, { indices: [optionIndex] });
             return res.json();
         },
-        onSuccess: () => {
+        onSuccess: (data, variables) => {
+            localStorage.setItem(`voted_${variables.id}`, 'true');
             queryClient.invalidateQueries({ queryKey: ["/api/votes"] });
             toast({
                 title: "✅ 투표가 완료되었습니다.",
@@ -85,8 +86,12 @@ export default function Vote() {
     });
 
     const handleVote = (id: string, optionIndex: number) => {
+        if (mutation.isPending) return; // 연속 클릭 차단
+
+        const localVoted = localStorage.getItem(`voted_${id}`);
         const vote = votes?.data?.find(v => v.id === id);
-        if (vote?.hasVoted) {
+
+        if (vote?.hasVoted || localVoted) {
             toast({
                 title: "이미 참여하셨습니다.",
                 description: "이 주제에 이미 투표하셨습니다.",

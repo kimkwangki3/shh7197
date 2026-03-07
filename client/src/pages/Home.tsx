@@ -10,6 +10,7 @@ import { Users, Clock, PlayCircle, MessageSquare, Plus, ChevronRight } from "luc
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import HeroSection from "@/components/HeroSection";
 
 export default function Home() {
   const [, setLocation] = useLocation();
@@ -35,6 +36,7 @@ export default function Home() {
 
   return (
     <div className="flex flex-col gap-6 p-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <HeroSection />
 
       {/* Ongoing Votes Section */}
       <section>

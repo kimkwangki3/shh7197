@@ -48,7 +48,7 @@ export default function HeroSection() {
           transition={{ delay: 0.2 }}
         >
           <img
-            src="/attached_assets/신대메인_1759163144206.png"
+            src="/attached_assets/hero-policy.png"
             alt="TODAY 신대정책"
             className="w-full h-auto object-cover"
           />

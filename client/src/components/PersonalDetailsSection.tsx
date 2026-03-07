@@ -23,15 +23,30 @@ export default function PersonalDetailsSection() {
       {/* Clean Background */}
       <div className="absolute top-0 left-0 w-full h-full bg-[#f8fafc]/50 pointer-events-none" />
 
-      {/* Profile Image & Basic Info */}
-      <div className="relative z-10 flex flex-col items-center mb-20 text-center">
-        <div className="relative mb-10 pt-4">
-          {/* Refined Spotlight Effect */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[45%] w-[400px] h-[400px] bg-gradient-to-b from-primary/20 to-transparent blur-[100px] rounded-full opacity-60 pointer-events-none" />
+      {/* Basic Info & Profile Image */}
+      <div className="relative z-10 flex flex-col items-center mb-16 text-center">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.2 }}
+          className="relative px-4 mb-12"
+        >
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-slate-900 rounded-full text-white text-[11px] font-bold tracking-[0.2em] uppercase mb-6 shadow-xl shadow-slate-200">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+            Candidate Profile
+          </div>
+          <h2 className="text-6xl font-black text-slate-900 mb-3 tracking-tight">홍성훈</h2>
+          <p className="text-primary font-bold text-2xl mb-8 tracking-[0.25em] uppercase opacity-90">Hong Seong-hoon</p>
+          <div className="w-16 h-1 bg-primary/30 mx-auto rounded-full" />
+        </motion.div>
+
+        <div className="relative mb-12 pt-4">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[45%] w-[380px] h-[380px] bg-gradient-to-b from-primary/15 to-transparent blur-[80px] rounded-full opacity-60 pointer-events-none" />
 
           <motion.div
-            className="relative w-72 h-80 flex items-end justify-center"
-            initial={{ opacity: 0, scale: 0.95, y: 40 }}
+            className="relative w-64 h-72 flex items-end justify-center"
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
             whileInView={{ opacity: 1, scale: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ type: "spring", stiffness: 60, damping: 20 }}
@@ -39,7 +54,7 @@ export default function PersonalDetailsSection() {
             <img
               src="/attached_assets/profile_transparent.png"
               alt="홍성훈"
-              className="h-full w-auto object-contain object-bottom drop-shadow-[0_30px_70px_rgba(0,0,0,0.15)] filter brightness-[1.02] contrast-[1.05] hover:scale-105 transition-transform duration-1000 select-none"
+              className="h-full w-auto object-contain object-bottom drop-shadow-[0_20px_50px_rgba(0,0,0,0.1)] filter brightness-[1.02] contrast-[1.05] hover:scale-105 transition-transform duration-1000 select-none"
             />
           </motion.div>
         </div>
@@ -51,15 +66,6 @@ export default function PersonalDetailsSection() {
           transition={{ delay: 0.4 }}
           className="relative px-4"
         >
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-slate-900 rounded-full text-white text-[11px] font-bold tracking-[0.2em] uppercase mb-6 shadow-xl shadow-slate-200">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-            Candidate Profile
-          </div>
-          <h2 className="text-6xl font-black text-slate-900 mb-3 tracking-tight">홍성훈</h2>
-          <p className="text-primary font-bold text-2xl mb-8 tracking-[0.25em] uppercase opacity-90">Hong Seong-hoon</p>
-
-          <div className="w-16 h-1 bg-primary/30 mx-auto mb-10 rounded-full" />
-
           <p className="text-slate-500 text-xl leading-relaxed max-w-[400px] mx-auto font-medium">
             순천 신대지구의 더 나은 미래를 위해<br />
             <span className="text-slate-900 font-extrabold border-b-4 border-primary/20 pb-1">주민과 함께 활동하는 실천가</span>입니다.

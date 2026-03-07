@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 
 export default function HeroSection() {
   return (
-    <section className="relative pt-6 pb-10 px-6 bg-white overflow-hidden">
+    <section className="relative pt-4 pb-8 px-6 bg-white overflow-hidden">
       {/* Policy News Image Only */}
       <motion.div
         className="rounded-2xl overflow-hidden shadow-2xl border-4 border-white"

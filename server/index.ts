@@ -11,6 +11,8 @@ const app = express();
 app.set('trust proxy', 1); // Render/Nginx 프록시 뒤에서 실제 클라이언트 IP 감지
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+app.use("/attached_assets", express.static(path.resolve(import.meta.dirname, "..", "attached_assets")));
+import path from "path"; // Added missing import if needed, wait, index.ts might not have 'path'
 
 app.use(
   session({

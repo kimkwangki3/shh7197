@@ -34,9 +34,10 @@ export default function HeroSection() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
       >
-        <h1 className="text-4xl font-extrabold text-slate-900 leading-tight">
-          더 나은 신대,<br />
-          <span className="text-primary italic">홍성훈</span>과 함께
+        <h1 className="text-slate-900 leading-tight tracking-tight">
+          <span className="text-2xl font-medium opacity-80">더 나은 신대지구,</span><br />
+          <span className="text-6xl font-black text-primary inline-block my-2">홍성훈</span>
+          <span className="text-2xl font-medium opacity-80">과 함께</span>
         </h1>
         <p className="text-slate-500 text-lg leading-relaxed">
           주민의 목소리를 듣고, 발로 뛰며<br />

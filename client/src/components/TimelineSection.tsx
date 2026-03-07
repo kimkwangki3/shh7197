@@ -10,15 +10,22 @@ import democraticPartyScene from "@assets/123_1759163444072.png";
 export default function TimelineSection() {
   const timelineData = [
     {
+      year: "현재",
+      title: "신대지구 중흥2차 입주자 대표회의 현)회장",
+      organization: "신대 중흥 2차 아파트",
+      description: "쾌적하고 안전한 주거 환경 조성을 위해 입주민의 권익을 대변하고, 투명한 아파트 운영과 공동체 활성화를 주도하며 살기 좋은 신대지구 만들기에 앞장서고 있습니다.",
+      image: "/attached_assets/jungheung_president.png"
+    },
+    {
       year: "2019-현재",
-      title: "신대지구발전위원회 회장(전)",
+      title: "신대지구 발전위원회 위원장(전)",
       organization: "신대지구발전위원회",
       description: "주민 의견을 모아 행정기관에 전달하는 가교 역할을 수행하며 지역 발전에 기여",
       image: meetingScene
     },
     {
       year: "현재",
-      title: "순천 교육 발전 협력 위원",
+      title: "순천교육발전협력위원회 (현)회장",
       organization: "순천 교육 발전 협력 위원회",
       description: "학부모, 주민단체와 협력하여 청소년 진로 및 교육 환경 개선 활동 추진",
       image: educationScene

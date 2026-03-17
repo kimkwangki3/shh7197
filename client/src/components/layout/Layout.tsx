@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { Home, CheckSquare, Lightbulb, ClipboardList, BookOpen, User, Bell, Menu, LogOut, ShieldCheck } from "lucide-react";
@@ -13,6 +13,14 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
     const [location] = useLocation();
+    const mainRef = useRef<HTMLElement>(null);
+
+    useEffect(() => {
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+        if (mainRef.current) mainRef.current.scrollTop = 0;
+    }, [location]);
 
     // Verify admin status from server
     const { data: adminCheck } = useQuery<{ isAdmin: boolean }>({
@@ -90,7 +98,7 @@ export default function Layout({ children }: LayoutProps) {
                 </header>
 
                 {/* Main Content */}
-                <main className="flex-1 pb-20">
+                <main ref={mainRef} className="flex-1 pb-20">
                     {children}
                 </main>
 

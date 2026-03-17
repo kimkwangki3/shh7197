@@ -36,7 +36,7 @@ export default function Layout({ children }: LayoutProps) {
         { href: "/", label: "홈", icon: Home },
         { href: "/votes", label: "투표소", icon: CheckSquare },
         { href: "/suggestions", label: "의견", icon: Lightbulb },
-        { href: "/board", label: "공약 게시판", icon: ClipboardList },
+        { href: "/board", label: "게시판", icon: ClipboardList },
         ...(user?.isAdmin ? [{ href: "/promises", label: "공약", icon: BookOpen }] : []),
         { href: "/profile", label: "홍성훈", icon: User },
     ];

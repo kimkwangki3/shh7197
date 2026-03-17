@@ -113,7 +113,12 @@ export default function BoardPage() {
 
     const categories = [
         { id: "all", label: "전체" },
-        { id: "activity", label: "활동사진" },
+        { id: "notice", label: "공지사항" },
+        { id: "activity-shinday", label: "신대지구발전" },
+        { id: "activity-welfare", label: "장애인 교육지원" },
+        { id: "activity-edu", label: "교육발전협력" },
+        { id: "activity-community", label: "지역소통" },
+        { id: "free", label: "자유게시판" },
     ];
 
     const filteredPosts = posts?.data?.filter(post =>
@@ -267,12 +272,20 @@ export default function BoardPage() {
                                                         <span className={cn(
                                                             "text-[10px] font-black px-2.5 py-1 rounded-full tracking-wide",
                                                             post.type === 'notice' ? 'bg-red-50 text-red-600' :
-                                                                post.type === 'policy' ? 'bg-blue-50 text-blue-600' :
-                                                                    post.type === 'activity' ? 'bg-emerald-50 text-emerald-600' :
-                                                                        'bg-slate-100 text-slate-500'
+                                                            post.type === 'activity-shinday' ? 'bg-blue-50 text-blue-600' :
+                                                            post.type === 'activity-welfare' ? 'bg-purple-50 text-purple-600' :
+                                                            post.type === 'activity-edu' ? 'bg-emerald-50 text-emerald-600' :
+                                                            post.type === 'activity-community' ? 'bg-orange-50 text-orange-600' :
+                                                            post.type === 'activity' ? 'bg-emerald-50 text-emerald-600' :
+                                                            'bg-slate-100 text-slate-500'
                                                         )}>
                                                             {post.type === 'notice' ? '공지사항' :
-                                                                post.type === 'activity' ? '활동사진' : '자유게시판'}
+                                                            post.type === 'activity-shinday' ? '신대지구발전' :
+                                                            post.type === 'activity-welfare' ? '장애인 교육지원' :
+                                                            post.type === 'activity-edu' ? '교육발전협력' :
+                                                            post.type === 'activity-community' ? '지역소통' :
+                                                            post.type === 'activity' ? '활동사진' :
+                                                            '자유게시판'}
                                                         </span>
                                                     </div>
                                                     <div className="flex items-center gap-1.5 text-slate-400 text-[11px] font-medium">
@@ -342,7 +355,13 @@ export default function BoardPage() {
                         <div className="p-6 flex flex-col h-full">
                             <div className="flex justify-between items-center mb-6">
                                 <Badge className="bg-primary/5 text-primary border-none font-bold">
-                                    {selectedPost.type === 'notice' ? '공지사항' : selectedPost.type === 'activity' ? '활동사진' : '자유게시판'}
+                                    {selectedPost.type === 'notice' ? '공지사항' :
+                                    selectedPost.type === 'activity-shinday' ? '신대지구발전' :
+                                    selectedPost.type === 'activity-welfare' ? '장애인 교육지원' :
+                                    selectedPost.type === 'activity-edu' ? '교육발전협력' :
+                                    selectedPost.type === 'activity-community' ? '지역소통' :
+                                    selectedPost.type === 'activity' ? '활동사진' :
+                                    '자유게시판'}
                                 </Badge>
                                 <button onClick={() => setSelectedPost(null)} className="p-2 text-slate-400">
                                     <X className="w-6 h-6" />

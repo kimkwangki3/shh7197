@@ -330,6 +330,10 @@ function BoardCreateForm({ onClose }: { onClose: () => void }) {
                 <div className="grid grid-cols-2 gap-3">
                     <select className="border rounded-lg px-3 py-2 text-sm" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
                         <option value="notice">공지사항</option>
+                        <option value="activity-shinday">신대지구발전</option>
+                        <option value="activity-welfare">장애인 교육지원</option>
+                        <option value="activity-edu">교육발전협력</option>
+                        <option value="activity-community">지역소통</option>
                         <option value="free">자유게시판</option>
                     </select>
                     <label className="flex items-center gap-2 text-sm cursor-pointer">

@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
     BarChart3, MessageSquare, ClipboardList, BookOpen,
     Plus, Trash2, ExternalLink, Loader2, LogOut, RefreshCcw,
-    Users, ShieldCheck, Send, X, ImageIcon
+    Users, ShieldCheck, Send, X, ImageIcon, Pencil
 } from "lucide-react";
 import { Link } from "wouter";
 import AdminLogin, { ADMIN_TOKEN_KEY } from "@/components/admin/AdminLogin";
@@ -168,6 +168,128 @@ function VoteCreateForm({ onClose }: { onClose: () => void }) {
                     <Button type="button" variant="outline" onClick={onClose}>취소</Button>
                     <Button type="submit" disabled={createVote.isPending} className="bg-blue-600 hover:bg-blue-700 text-white min-w-[100px]">
                         {createVote.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "투표 등록"}
+                    </Button>
+                </div>
+            </form>
+        </div>
+    );
+}
+
+
+// ─── 투표 수정 폼 ─────────────────────────────────────────────
+function VoteEditForm({ vote, onClose }: { vote: Vote; onClose: () => void }) {
+    const { toast } = useToast();
+    const queryClient = useQueryClient();
+
+    const [form, setForm] = useState({
+        title: vote.title,
+        description: vote.description,
+        category: vote.category,
+        endDate: new Date(vote.endDate).toISOString().slice(0, 16),
+        isHero: vote.isHero,
+        allowMultiple: vote.allowMultiple,
+        options: vote.options.length > 0 ? [...vote.options] : ["", ""],
+    });
+
+    const updateVote = useMutation({
+        mutationFn: (data: unknown) => adminFetch("PUT", `/api/admin/votes/${vote.id}`, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["/api/admin/votes"] });
+            toast({ title: "✅ 투표 수정 완료", description: "투표 내용이 업데이트되었습니다." });
+            onClose();
+        },
+        onError: () => toast({ title: "❌ 오류", description: "투표 수정에 실패했습니다.", variant: "destructive" })
+    });
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const filteredOptions = form.options.filter(opt => opt.trim() !== "");
+        if (!form.title || !form.endDate) return toast({ title: "입력 오류", description: "제목과 마감일을 입력해주세요.", variant: "destructive" });
+        if (filteredOptions.length < 2) return toast({ title: "입력 오류", description: "투표 항목을 최소 2개 이상 입력해주세요.", variant: "destructive" });
+
+        const optionsChanged = JSON.stringify(filteredOptions) !== JSON.stringify(vote.options);
+        const submitData: Record<string, unknown> = {
+            ...form,
+            options: filteredOptions,
+            endDate: new Date(form.endDate).toISOString(),
+        };
+        if (optionsChanged) {
+            submitData.results = new Array(filteredOptions.length).fill(0);
+        }
+        updateVote.mutate(submitData);
+    };
+
+    const updateOption = (index: number, value: string) => {
+        const newOptions = [...form.options];
+        newOptions[index] = value;
+        setForm(f => ({ ...f, options: newOptions }));
+    };
+
+    const addOption = () => setForm(f => ({ ...f, options: [...f.options, ""] }));
+
+    const removeOption = (index: number) => {
+        if (form.options.length <= 2) return;
+        setForm(f => ({ ...f, options: f.options.filter((_, i) => i !== index) }));
+    };
+
+    return (
+        <div className="bg-orange-50 border border-orange-200 rounded-2xl p-6 mt-2">
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-orange-800 flex items-center gap-2"><Pencil className="w-4 h-4" /> 투표 수정</h3>
+                <Button variant="ghost" size="sm" onClick={onClose}><X className="w-4 h-4" /></Button>
+            </div>
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Input placeholder="투표 제목" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} className="col-span-full" />
+                <Textarea placeholder="투표 설명" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="col-span-full min-h-[80px]" />
+
+                <div className="col-span-full space-y-2">
+                    <label className="text-xs font-medium text-slate-500 ml-1">
+                        투표 항목 <span className="text-orange-500">(항목 변경 시 기존 투표 결과가 초기화됩니다)</span>
+                    </label>
+                    {form.options.map((option, idx) => (
+                        <div key={idx} className="flex gap-2">
+                            <Input
+                                placeholder={`항목 ${idx + 1}`}
+                                value={option}
+                                onChange={e => updateOption(idx, e.target.value)}
+                            />
+                            {form.options.length > 2 && (
+                                <Button type="button" variant="ghost" size="sm" onClick={() => removeOption(idx)}>
+                                    <Trash2 className="w-4 h-4 text-red-400" />
+                                </Button>
+                            )}
+                        </div>
+                    ))}
+                    <Button type="button" variant="outline" size="sm" onClick={addOption} className="w-full border-dashed border-orange-300 text-orange-600 bg-white">
+                        + 항목 추가
+                    </Button>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-slate-500 ml-1">카테고리</label>
+                    <select className="border rounded-lg px-3 py-2 text-sm bg-white" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+                        {["정책", "교통", "복지", "환경", "교육", "안전", "기타"].map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-slate-500 ml-1">마감 일시</label>
+                    <Input type="datetime-local" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} className="text-sm" />
+                </div>
+
+                <div className="col-span-full flex gap-4 mt-1">
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input type="checkbox" checked={form.isHero} onChange={e => setForm(f => ({ ...f, isHero: e.target.checked }))} className="w-4 h-4 rounded" />
+                        <span className="font-medium text-slate-700">히어로 투표로 지정</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input type="checkbox" checked={form.allowMultiple} onChange={e => setForm(f => ({ ...f, allowMultiple: e.target.checked }))} className="w-4 h-4 rounded" />
+                        <span className="font-medium text-slate-700">복수 선택 허용</span>
+                    </label>
+                </div>
+                <div className="col-span-full flex gap-2 justify-end">
+                    <Button type="button" variant="outline" onClick={onClose}>취소</Button>
+                    <Button type="submit" disabled={updateVote.isPending} className="bg-orange-600 hover:bg-orange-700 text-white min-w-[100px]">
+                        {updateVote.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "수정 완료"}
                     </Button>
                 </div>
             </form>
@@ -407,6 +529,7 @@ export default function Admin() {
     const queryClient = useQueryClient();
     const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
     const [showVoteForm, setShowVoteForm] = useState(false);
+    const [editingVoteId, setEditingVoteId] = useState<string | null>(null);
     const [showBoardForm, setShowBoardForm] = useState(false);
     const [showPromiseForm, setShowPromiseForm] = useState(false);
 
@@ -583,35 +706,49 @@ export default function Admin() {
                             ) : (
                                 <div className="space-y-3">
                                     {votes.map(vote => (
-                                        <div key={vote.id} className="flex items-center justify-between p-4 border border-slate-100 rounded-xl hover:border-blue-200 transition-colors group">
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">{vote.category}</span>
-                                                    {vote.isHero && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">🔥 히어로</span>}
-                                                    <span className="text-xs text-slate-400">{new Date(vote.endDate).toLocaleDateString("ko-KR")} 마감</span>
-                                                </div>
-                                                <p className="font-semibold text-slate-800 mt-1">{vote.title}</p>
-                                                <div className="flex items-center gap-3 mt-1 text-sm text-slate-500 flex-wrap">
-                                                    <span className="flex items-center gap-1"><Users className="w-3 h-3" />
-                                                        {(vote.results || []).reduce((a: number, b: number) => a + b, 0)}명 참여
-                                                    </span>
-                                                    <div className="flex gap-2 text-xs">
-                                                        {(vote.options || []).map((opt, idx) => (
-                                                            <span key={idx} className="bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
-                                                                {opt}: {(vote.results || [])[idx] || 0}
-                                                            </span>
-                                                        ))}
+                                        <div key={vote.id}>
+                                            <div className="flex items-center justify-between p-4 border border-slate-100 rounded-xl hover:border-blue-200 transition-colors group">
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">{vote.category}</span>
+                                                        {vote.isHero && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">🔥 히어로</span>}
+                                                        <span className="text-xs text-slate-400">{new Date(vote.endDate).toLocaleDateString("ko-KR")} 마감</span>
+                                                    </div>
+                                                    <p className="font-semibold text-slate-800 mt-1">{vote.title}</p>
+                                                    <div className="flex items-center gap-3 mt-1 text-sm text-slate-500 flex-wrap">
+                                                        <span className="flex items-center gap-1"><Users className="w-3 h-3" />
+                                                            {(vote.results || []).reduce((a: number, b: number) => a + b, 0)}명 참여
+                                                        </span>
+                                                        <div className="flex gap-2 text-xs">
+                                                            {(vote.options || []).map((opt, idx) => (
+                                                                <span key={idx} className="bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
+                                                                    {opt}: {(vote.results || [])[idx] || 0}
+                                                                </span>
+                                                            ))}
+                                                        </div>
                                                     </div>
                                                 </div>
+                                                <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                                                    <Button
+                                                        variant="ghost" size="sm"
+                                                        className="text-orange-400 hover:bg-orange-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        onClick={() => setEditingVoteId(editingVoteId === vote.id ? null : vote.id)}
+                                                    >
+                                                        <Pencil className="w-4 h-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost" size="sm"
+                                                        className="text-red-400 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        onClick={() => deleteVote.mutate(vote.id)}
+                                                        disabled={deleteVote.isPending}
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
+                                                </div>
                                             </div>
-                                            <Button
-                                                variant="ghost" size="sm"
-                                                className="text-red-400 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity ml-2 flex-shrink-0"
-                                                onClick={() => deleteVote.mutate(vote.id)}
-                                                disabled={deleteVote.isPending}
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </Button>
+                                            {editingVoteId === vote.id && (
+                                                <VoteEditForm vote={vote} onClose={() => setEditingVoteId(null)} />
+                                            )}
                                         </div>
                                     ))}
                                 </div>

@@ -108,6 +108,7 @@ export interface IStorage {
   getVote(id: string): Promise<Vote | undefined>;
   createVote(vote: InsertVote): Promise<Vote>;
   updateVoteCount(id: string, optionIndices: number[]): Promise<Vote>;
+  updateVote(id: string, vote: Partial<InsertVote>): Promise<Vote>;
   deleteVote(id: string): Promise<void>;
 
   // Suggestion methods

@@ -858,6 +858,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin: 투표 수정
+  app.put("/api/admin/votes/:id", isAdmin, async (req: Request, res: Response) => {
+    try {
+      const data = insertVoteSchema.partial().parse(req.body);
+      const vote = await storage.updateVote(req.params.id, data);
+      res.json({ success: true, data: vote });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ success: false, errors: error.errors });
+      } else if (error.message?.includes("not found")) {
+        res.status(404).json({ success: false, message: "투표를 찾을 수 없습니다." });
+      } else {
+        res.status(500).json({ success: false, message: "투표 수정에 실패했습니다." });
+      }
+    }
+  });
+
   // Admin: 투표 삭제
   app.delete("/api/admin/votes/:id", isAdmin, async (req: Request, res: Response) => {
     try {

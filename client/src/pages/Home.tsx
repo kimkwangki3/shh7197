@@ -158,7 +158,7 @@ export default function Home() {
       <section>
         <div className="flex items-center justify-between mb-3 px-1">
           <h2 className="text-lg font-bold flex items-center gap-2">
-            <span className="text-xl">📢</span> 최근 공약게시판
+            <span className="text-xl">📢</span> 최근 게시판
           </h2>
           <Button
             variant="ghost"

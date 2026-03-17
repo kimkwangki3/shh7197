@@ -330,7 +330,6 @@ function BoardCreateForm({ onClose }: { onClose: () => void }) {
                 <div className="grid grid-cols-2 gap-3">
                     <select className="border rounded-lg px-3 py-2 text-sm" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
                         <option value="notice">공지사항</option>
-                        <option value="policy">정책소식</option>
                         <option value="free">자유게시판</option>
                     </select>
                     <label className="flex items-center gap-2 text-sm cursor-pointer">
@@ -809,7 +808,7 @@ export default function Admin() {
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 flex-wrap">
                                                     <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
-                                                        {board.type === "notice" ? "공지" : board.type === "policy" ? "정책" : "자유"}
+                                                        {board.type === "notice" ? "공지" : "자유"}
                                                     </span>
                                                     {board.isPinned && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">📌 고정</span>}
                                                     <span className="text-xs text-slate-400">{new Date(board.createdAt).toLocaleDateString("ko-KR")}</span>

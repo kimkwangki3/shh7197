@@ -113,7 +113,6 @@ export default function BoardPage() {
 
     const categories = [
         { id: "all", label: "전체" },
-        { id: "policy", label: "정책소식" },
         { id: "activity", label: "활동사진" },
     ];
 
@@ -138,7 +137,7 @@ export default function BoardPage() {
             <div className="bg-white px-5 pt-8 pb-6 border-b border-slate-100">
                 <div className="flex justify-between items-center mb-6">
                     <div>
-                        <h2 className="text-[26px] font-black text-primary leading-tight mb-1 tracking-tight">공약 게시판</h2>
+                        <h2 className="text-[26px] font-black text-primary leading-tight mb-1 tracking-tight">게시판</h2>
                         <p className="text-sm text-slate-400 font-medium">소통과 소식이 한자리에</p>
                     </div>
                     {isAdmin && !showWriteForm && (
@@ -273,8 +272,7 @@ export default function BoardPage() {
                                                                         'bg-slate-100 text-slate-500'
                                                         )}>
                                                             {post.type === 'notice' ? '공지사항' :
-                                                                post.type === 'policy' ? '정책소식' :
-                                                                    post.type === 'activity' ? '활동사진' : '자유게시판'}
+                                                                post.type === 'activity' ? '활동사진' : '자유게시판'}
                                                         </span>
                                                     </div>
                                                     <div className="flex items-center gap-1.5 text-slate-400 text-[11px] font-medium">
@@ -344,7 +342,7 @@ export default function BoardPage() {
                         <div className="p-6 flex flex-col h-full">
                             <div className="flex justify-between items-center mb-6">
                                 <Badge className="bg-primary/5 text-primary border-none font-bold">
-                                    {selectedPost.type === 'notice' ? '공지사항' : selectedPost.type === 'policy' ? '정책소식' : selectedPost.type === 'activity' ? '활동사진' : '자유게시판'}
+                                    {selectedPost.type === 'notice' ? '공지사항' : selectedPost.type === 'activity' ? '활동사진' : '자유게시판'}
                                 </Badge>
                                 <button onClick={() => setSelectedPost(null)} className="p-2 text-slate-400">
                                     <X className="w-6 h-6" />

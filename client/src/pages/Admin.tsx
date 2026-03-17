@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
     BarChart3, MessageSquare, ClipboardList, BookOpen,
     Plus, Trash2, ExternalLink, Loader2, LogOut, RefreshCcw,
-    Users, ShieldCheck, Send, X, ImageIcon, Pencil
+    Users, ShieldCheck, Send, X, ImageIcon, Pencil, ThumbsUp, Settings
 } from "lucide-react";
 import { Link } from "wouter";
 import AdminLogin, { ADMIN_TOKEN_KEY } from "@/components/admin/AdminLogin";
@@ -189,6 +189,7 @@ function VoteEditForm({ vote, onClose }: { vote: Vote; onClose: () => void }) {
         isHero: vote.isHero,
         allowMultiple: vote.allowMultiple,
         options: vote.options.length > 0 ? [...vote.options] : ["", ""],
+        results: vote.results.length > 0 ? [...vote.results] : [],
     });
 
     const updateVote = useMutation({
@@ -212,10 +213,10 @@ function VoteEditForm({ vote, onClose }: { vote: Vote; onClose: () => void }) {
             ...form,
             options: filteredOptions,
             endDate: new Date(form.endDate).toISOString(),
+            results: optionsChanged
+                ? new Array(filteredOptions.length).fill(0)
+                : form.results.slice(0, filteredOptions.length),
         };
-        if (optionsChanged) {
-            submitData.results = new Array(filteredOptions.length).fill(0);
-        }
         updateVote.mutate(submitData);
     };
 
@@ -247,12 +248,27 @@ function VoteEditForm({ vote, onClose }: { vote: Vote; onClose: () => void }) {
                         투표 항목 <span className="text-orange-500">(항목 변경 시 기존 투표 결과가 초기화됩니다)</span>
                     </label>
                     {form.options.map((option, idx) => (
-                        <div key={idx} className="flex gap-2">
+                        <div key={idx} className="flex gap-2 items-center">
                             <Input
                                 placeholder={`항목 ${idx + 1}`}
                                 value={option}
                                 onChange={e => updateOption(idx, e.target.value)}
+                                className="flex-1"
                             />
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                                <span className="text-xs text-slate-400 whitespace-nowrap">투표수</span>
+                                <Input
+                                    type="number"
+                                    min={0}
+                                    value={form.results[idx] ?? 0}
+                                    onChange={e => {
+                                        const newResults = [...form.results];
+                                        newResults[idx] = Number(e.target.value);
+                                        setForm(f => ({ ...f, results: newResults }));
+                                    }}
+                                    className="w-20 text-center text-sm"
+                                />
+                            </div>
                             {form.options.length > 2 && (
                                 <Button type="button" variant="ghost" size="sm" onClick={() => removeOption(idx)}>
                                     <Trash2 className="w-4 h-4 text-red-400" />
@@ -600,6 +616,41 @@ export default function Admin() {
         onError: () => toast({ title: "❌ 삭제 실패", variant: "destructive" })
     });
 
+    // ── 고급 관리 state ──
+    const [editingLike, setEditingLike] = useState<{ id: string; type: string; value: number } | null>(null);
+
+    const { data: allCommentsData, isLoading: commentsLoading } = useQuery({
+        queryKey: ["/api/admin/comments/all"],
+        queryFn: () => adminFetch("GET", "/api/admin/comments/all").then((r: any) => r.data || []),
+        enabled: !!isAdmin
+    });
+    const allComments: Comment[] = allCommentsData || [];
+
+    const deleteCommentAdmin = useMutation({
+        mutationFn: (id: string) => adminFetch("DELETE", `/api/admin/comments/${id}`),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/comments/all"] }); toast({ title: "✅ 댓글 삭제 완료" }); },
+        onError: () => toast({ title: "❌ 삭제 실패", variant: "destructive" })
+    });
+
+    const saveLike = useMutation({
+        mutationFn: ({ id, type, count }: { id: string; type: string; count: number }) => {
+            const url = type === "board"
+                ? `/api/admin/board/${id}/likes`
+                : type === "suggestion"
+                    ? `/api/admin/suggestions/${id}/likes`
+                    : `/api/admin/comments/${id}/likes`;
+            return adminFetch("PUT", url, { count });
+        },
+        onSuccess: (_, vars) => {
+            if (vars.type === "board") queryClient.invalidateQueries({ queryKey: ["/api/board"] });
+            if (vars.type === "suggestion") queryClient.invalidateQueries({ queryKey: ["/api/suggestions"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/admin/comments/all"] });
+            setEditingLike(null);
+            toast({ title: "✅ 좋아요 수 수정 완료" });
+        },
+        onError: () => toast({ title: "❌ 수정 실패", variant: "destructive" })
+    });
+
     if (isAdmin === null) {
         return (
             <div className="flex items-center justify-center min-h-screen">
@@ -686,6 +737,7 @@ export default function Admin() {
                             <TabsTrigger value="suggestions" className="px-5 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-white">💬 의견 관리</TabsTrigger>
                             <TabsTrigger value="board" className="px-5 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-white">📋 게시판 관리</TabsTrigger>
                             <TabsTrigger value="promises" className="px-5 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-white">📌 공약 관리</TabsTrigger>
+                            <TabsTrigger value="advanced" className="px-5 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-white">⚙️ 고급 관리</TabsTrigger>
                         </TabsList>
                     </div>
 
@@ -891,6 +943,155 @@ export default function Admin() {
                                     ))}
                                 </div>
                             )}
+                        </div>
+                    </TabsContent>
+
+                    {/* ── 고급 관리 ── */}
+                    <TabsContent value="advanced">
+                        <div className="space-y-6">
+
+                            {/* 댓글 관리 */}
+                            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+                                <div className="mb-5">
+                                    <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2"><MessageSquare className="w-5 h-5 text-indigo-500" /> 댓글 관리</h3>
+                                    <p className="text-sm text-slate-500 mt-1">모든 댓글을 확인하고 삭제할 수 있습니다. (관리자 전용)</p>
+                                </div>
+                                {commentsLoading ? (
+                                    <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+                                ) : allComments.length === 0 ? (
+                                    <p className="text-center py-8 text-slate-400">등록된 댓글이 없습니다.</p>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {allComments.map(comment => (
+                                            <div key={comment.id} className="flex items-start justify-between p-3 border border-slate-100 rounded-xl hover:border-indigo-200 transition-colors group">
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${comment.targetType === 'vote' ? 'bg-blue-50 text-blue-600' : comment.targetType === 'board' ? 'bg-amber-50 text-amber-600' : 'bg-indigo-50 text-indigo-600'}`}>
+                                                            {comment.targetType === 'vote' ? '투표' : comment.targetType === 'board' ? '게시판' : '의견'}
+                                                        </span>
+                                                        <span className="text-xs text-slate-400">{new Date(comment.createdAt).toLocaleDateString("ko-KR")}</span>
+                                                        <span className="flex items-center gap-1 text-xs text-slate-400"><ThumbsUp className="w-3 h-3" />{comment.likeCount}</span>
+                                                    </div>
+                                                    <p className="text-sm text-slate-700 line-clamp-2">{comment.content}</p>
+                                                </div>
+                                                <Button
+                                                    variant="ghost" size="sm"
+                                                    className="text-red-400 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity ml-2 flex-shrink-0"
+                                                    onClick={() => deleteCommentAdmin.mutate(comment.id)}
+                                                    disabled={deleteCommentAdmin.isPending}
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 좋아요 수 관리 */}
+                            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+                                <div className="mb-5">
+                                    <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2"><ThumbsUp className="w-5 h-5 text-pink-500" /> 좋아요 수 관리</h3>
+                                    <p className="text-sm text-slate-500 mt-1">게시글·의견·댓글의 좋아요 수를 직접 수정할 수 있습니다. (관리자 전용)</p>
+                                </div>
+
+                                {/* 게시판 좋아요 */}
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">게시판</p>
+                                <div className="space-y-2 mb-5">
+                                    {boards.map(board => (
+                                        <div key={board.id} className="flex items-center justify-between p-3 border border-slate-100 rounded-xl">
+                                            <p className="text-sm text-slate-700 flex-1 truncate mr-3">{board.title}</p>
+                                            <div className="flex items-center gap-2 flex-shrink-0">
+                                                {editingLike?.id === board.id ? (
+                                                    <>
+                                                        <Input
+                                                            type="number" min={0}
+                                                            value={editingLike.value}
+                                                            onChange={e => setEditingLike(prev => prev ? { ...prev, value: Number(e.target.value) } : null)}
+                                                            className="w-20 h-8 text-center text-sm"
+                                                        />
+                                                        <Button size="sm" className="h-8 bg-pink-500 hover:bg-pink-600 text-white"
+                                                            onClick={() => saveLike.mutate({ id: board.id, type: "board", count: editingLike.value })}
+                                                            disabled={saveLike.isPending}>저장</Button>
+                                                        <Button size="sm" variant="ghost" className="h-8" onClick={() => setEditingLike(null)}>취소</Button>
+                                                    </>
+                                                ) : (
+                                                    <button onClick={() => setEditingLike({ id: board.id, type: "board", value: board.likeCount })}
+                                                        className="flex items-center gap-1 text-sm text-slate-500 hover:text-pink-500 transition-colors">
+                                                        <ThumbsUp className="w-3.5 h-3.5" />{board.likeCount}
+                                                        <Pencil className="w-3 h-3 opacity-50" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* 의견 좋아요 */}
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">의견</p>
+                                <div className="space-y-2 mb-5">
+                                    {suggestions.map(s => (
+                                        <div key={s.id} className="flex items-center justify-between p-3 border border-slate-100 rounded-xl">
+                                            <p className="text-sm text-slate-700 flex-1 truncate mr-3">{s.title}</p>
+                                            <div className="flex items-center gap-2 flex-shrink-0">
+                                                {editingLike?.id === s.id ? (
+                                                    <>
+                                                        <Input
+                                                            type="number" min={0}
+                                                            value={editingLike.value}
+                                                            onChange={e => setEditingLike(prev => prev ? { ...prev, value: Number(e.target.value) } : null)}
+                                                            className="w-20 h-8 text-center text-sm"
+                                                        />
+                                                        <Button size="sm" className="h-8 bg-pink-500 hover:bg-pink-600 text-white"
+                                                            onClick={() => saveLike.mutate({ id: s.id, type: "suggestion", count: editingLike.value })}
+                                                            disabled={saveLike.isPending}>저장</Button>
+                                                        <Button size="sm" variant="ghost" className="h-8" onClick={() => setEditingLike(null)}>취소</Button>
+                                                    </>
+                                                ) : (
+                                                    <button onClick={() => setEditingLike({ id: s.id, type: "suggestion", value: s.likeCount })}
+                                                        className="flex items-center gap-1 text-sm text-slate-500 hover:text-pink-500 transition-colors">
+                                                        <ThumbsUp className="w-3.5 h-3.5" />{s.likeCount}
+                                                        <Pencil className="w-3 h-3 opacity-50" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* 댓글 좋아요 */}
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">댓글</p>
+                                <div className="space-y-2">
+                                    {allComments.map(comment => (
+                                        <div key={comment.id} className="flex items-center justify-between p-3 border border-slate-100 rounded-xl">
+                                            <p className="text-sm text-slate-700 flex-1 truncate mr-3">{comment.content}</p>
+                                            <div className="flex items-center gap-2 flex-shrink-0">
+                                                {editingLike?.id === comment.id ? (
+                                                    <>
+                                                        <Input
+                                                            type="number" min={0}
+                                                            value={editingLike.value}
+                                                            onChange={e => setEditingLike(prev => prev ? { ...prev, value: Number(e.target.value) } : null)}
+                                                            className="w-20 h-8 text-center text-sm"
+                                                        />
+                                                        <Button size="sm" className="h-8 bg-pink-500 hover:bg-pink-600 text-white"
+                                                            onClick={() => saveLike.mutate({ id: comment.id, type: "comment", count: editingLike.value })}
+                                                            disabled={saveLike.isPending}>저장</Button>
+                                                        <Button size="sm" variant="ghost" className="h-8" onClick={() => setEditingLike(null)}>취소</Button>
+                                                    </>
+                                                ) : (
+                                                    <button onClick={() => setEditingLike({ id: comment.id, type: "comment", value: comment.likeCount })}
+                                                        className="flex items-center gap-1 text-sm text-slate-500 hover:text-pink-500 transition-colors">
+                                                        <ThumbsUp className="w-3.5 h-3.5" />{comment.likeCount}
+                                                        <Pencil className="w-3 h-3 opacity-50" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
                         </div>
                     </TabsContent>
                 </Tabs>

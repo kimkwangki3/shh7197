@@ -962,6 +962,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin: 전체 댓글 조회
+  app.get("/api/admin/comments/all", isAdmin, async (req: Request, res: Response) => {
+    try {
+      const allComments = await storage.getAllComments();
+      res.json({ success: true, data: allComments });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: "댓글 목록 조회에 실패했습니다." });
+    }
+  });
+
   // Admin: 댓글 삭제
   app.delete("/api/admin/comments/:id", isAdmin, async (req: Request, res: Response) => {
     try {
@@ -969,6 +979,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true, message: "댓글이 삭제되었습니다." });
     } catch (error: any) {
       res.status(500).json({ success: false, message: "댓글 삭제에 실패했습니다." });
+    }
+  });
+
+  // Admin: 게시글 좋아요 수 수정
+  app.put("/api/admin/board/:id/likes", isAdmin, async (req: Request, res: Response) => {
+    try {
+      const count = Number(req.body.count);
+      if (isNaN(count) || count < 0) return res.status(400).json({ success: false, message: "올바른 숫자를 입력해주세요." });
+      const item = await storage.setBoardLikeCount(req.params.id, count);
+      res.json({ success: true, data: item });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: "좋아요 수 수정에 실패했습니다." });
+    }
+  });
+
+  // Admin: 의견 좋아요 수 수정
+  app.put("/api/admin/suggestions/:id/likes", isAdmin, async (req: Request, res: Response) => {
+    try {
+      const count = Number(req.body.count);
+      if (isNaN(count) || count < 0) return res.status(400).json({ success: false, message: "올바른 숫자를 입력해주세요." });
+      const item = await storage.setSuggestionLikeCount(req.params.id, count);
+      res.json({ success: true, data: item });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: "좋아요 수 수정에 실패했습니다." });
+    }
+  });
+
+  // Admin: 댓글 좋아요 수 수정
+  app.put("/api/admin/comments/:id/likes", isAdmin, async (req: Request, res: Response) => {
+    try {
+      const count = Number(req.body.count);
+      if (isNaN(count) || count < 0) return res.status(400).json({ success: false, message: "올바른 숫자를 입력해주세요." });
+      const item = await storage.setCommentLikeCount(req.params.id, count);
+      res.json({ success: true, data: item });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: "댓글 좋아요 수 수정에 실패했습니다." });
     }
   });
 

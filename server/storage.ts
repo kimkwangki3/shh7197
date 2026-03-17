@@ -136,11 +136,17 @@ export interface IStorage {
 
   // Comment methods
   getComments(targetType: string, targetId: string): Promise<Comment[]>;
+  getAllComments(): Promise<Comment[]>;
   getComment(id: string): Promise<Comment | undefined>;
   createComment(comment: InsertComment): Promise<Comment>;
   updateComment(id: string, comment: Partial<InsertComment>): Promise<Comment>;
   updateCommentLikes(id: string, ipAddress: string): Promise<Comment>;
   deleteComment(id: string): Promise<void>;
+
+  // Admin like count setters
+  setBoardLikeCount(id: string, count: number): Promise<Board>;
+  setSuggestionLikeCount(id: string, count: number): Promise<Suggestion>;
+  setCommentLikeCount(id: string, count: number): Promise<Comment>;
 
   // Like methods
   hasLiked(targetType: string, targetId: string, ipAddress: string): Promise<boolean>;
@@ -642,6 +648,28 @@ export class DatabaseStorage implements IStorage {
 
   async deleteComment(id: string): Promise<void> {
     await db.delete(comments).where(eq(comments.id, id));
+  }
+
+  async getAllComments(): Promise<Comment[]> {
+    return await db.select().from(comments).orderBy(desc(comments.createdAt));
+  }
+
+  async setBoardLikeCount(id: string, count: number): Promise<Board> {
+    const [item] = await db.update(boards).set({ likeCount: count, updatedAt: new Date() }).where(eq(boards.id, id)).returning();
+    if (!item) throw new Error("Board item not found");
+    return item;
+  }
+
+  async setSuggestionLikeCount(id: string, count: number): Promise<Suggestion> {
+    const [item] = await db.update(suggestions).set({ likeCount: count }).where(eq(suggestions.id, id)).returning();
+    if (!item) throw new Error("Suggestion not found");
+    return item;
+  }
+
+  async setCommentLikeCount(id: string, count: number): Promise<Comment> {
+    const [item] = await db.update(comments).set({ likeCount: count }).where(eq(comments.id, id)).returning();
+    if (!item) throw new Error("Comment not found");
+    return item;
   }
 }
 

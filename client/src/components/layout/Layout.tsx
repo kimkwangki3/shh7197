@@ -90,10 +90,6 @@ export default function Layout({ children }: LayoutProps) {
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
-
-                        <button className="text-white p-2 hover:bg-white/10 rounded-full transition-colors">
-                            <Menu className="w-6 h-6" />
-                        </button>
                     </div>
                 </header>
 

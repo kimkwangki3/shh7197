@@ -13,9 +13,9 @@ export default function PersonalDetailsSection() {
   ];
 
   const educationHistory = [
-    { school: "국립 경상대학교", major: "기계공학과 졸업" },
-    { school: "순천공업고등학교", major: "공업계열 졸업" },
-    { school: "회덕중학교", major: "중학교 졸업" }
+    { school: "순천공업고등학교", major: "졸업 (24회)" },
+    { school: "순천공업전문대학교 건축설비학과", major: "졸업 (현 순천제일대학교)" },
+    { school: "진주산업대학교 융합기술공과대학 기계공학과", major: "졸업 (현 경상국립대학교)" }
   ];
 
   return (

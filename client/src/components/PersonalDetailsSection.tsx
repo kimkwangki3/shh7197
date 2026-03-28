@@ -9,7 +9,7 @@ export default function PersonalDetailsSection() {
   const personalInfo = [
     { icon: CalendarDays, label: "생년월일", value: "1975년 2월 28일" },
     { icon: MapPin, label: "출생지", value: "전라남도 장흥군" },
-    { icon: Building, label: "직장", value: "㈜포스코 플랜텍 리튬TF" }
+    { icon: Building, label: "직장", value: "㈜플랜텍 근무 (구 포스코플랜텍)" }
   ];
 
   const educationHistory = [

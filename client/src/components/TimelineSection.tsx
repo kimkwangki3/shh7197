@@ -4,7 +4,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import meetingScene from "@assets/신대메인_1759163144206.png";
 import educationScene from "@assets/교육메인_1759163227211.png";
-import poscoScene from "@assets/unnamed (2)_1759163227210.png";
 import democraticPartyScene from "@assets/123_1759163444072.png";
 
 export default function TimelineSection() {
@@ -30,13 +29,6 @@ export default function TimelineSection() {
       description: "학부모, 주민단체와 협력하여 청소년 진로 및 교육 환경 개선 활동 추진",
       image: educationScene
     },
-    {
-      year: "현재",
-      title: "㈜포스코 플랜텍 리튬TF",
-      organization: "㈜포스코 플랜텍",
-      description: "이차전지 소재 및 관련 플랜트 사업 전략 분야에서 전문성을 발휘하며 근무 중",
-      image: poscoScene
-    }
   ];
 
   return (

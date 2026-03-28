@@ -28,12 +28,12 @@ function Router() {
     <Layout>
       <ScrollToTop />
       <Switch>
-        <Route path="/" component={Home} />
+        <Route path="/" component={Profile} />
+        <Route path="/home" component={Home} />
         <Route path="/votes" component={Vote} />
         <Route path="/suggestions" component={Suggestions} />
         <Route path="/board" component={Board} />
         <Route path="/promises" component={Promises} />
-        <Route path="/profile" component={Profile} />
         <Route path="/admin" component={Admin} />
         {/* Fallback to 404 */}
         <Route component={NotFound} />

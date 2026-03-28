@@ -19,12 +19,12 @@ export default function PersonalDetailsSection() {
   ];
 
   return (
-    <section className="py-24 px-6 relative overflow-hidden bg-white">
+    <section className="py-10 px-6 relative overflow-hidden bg-white">
       {/* Clean Background */}
       <div className="absolute top-0 left-0 w-full h-full bg-[#f8fafc]/50 pointer-events-none" />
 
       {/* Basic Info & Profile Image */}
-      <div className="relative z-10 flex flex-col items-center mb-16 text-center">
+      <div className="relative z-10 flex flex-col items-center mb-10 text-center">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -32,12 +32,12 @@ export default function PersonalDetailsSection() {
           transition={{ delay: 0.2 }}
           className="relative px-4 mb-12"
         >
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-slate-900 rounded-full text-white text-[11px] font-bold tracking-[0.2em] uppercase mb-6 shadow-xl shadow-slate-200">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-            Candidate Profile
-          </div>
-          <h2 className="text-6xl font-black text-slate-900 mb-3 tracking-tight">홍성훈</h2>
-          <p className="text-primary font-bold text-2xl mb-8 tracking-[0.25em] uppercase opacity-90">Hong Seong-hoon</p>
+          <h2 className="font-black mb-3 flex items-baseline justify-center gap-2 whitespace-nowrap">
+            <span className="text-amber-400 text-7xl font-black drop-shadow-[0_2px_0_rgba(0,0,0,0.3)]" style={{ WebkitTextStroke: '1.5px rgba(0,0,0,0.2)' }}>3</span>
+            <span className="text-[#1e3a5f] text-6xl tracking-[0.25em]">홍 성 훈</span>
+          </h2>
+          <p className="text-primary font-bold text-xl tracking-wide">신대지구 도의원 예비후보</p>
+          <p className="text-slate-500 font-semibold text-base mb-8 tracking-wider">조국혁신당</p>
           <div className="w-16 h-1 bg-primary/30 mx-auto rounded-full" />
         </motion.div>
 

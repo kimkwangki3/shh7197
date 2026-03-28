@@ -68,14 +68,15 @@ export default function Layout({ children }: LayoutProps) {
             <div className="w-full max-w-[480px] min-h-screen bg-white shadow-xl flex flex-col relative">
 
                 {/* Header */}
-                <header className="h-14 bg-primary px-4 flex items-center justify-between sticky top-0 z-50">
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center overflow-hidden">
+                <header className="bg-primary px-4 py-2 flex items-center justify-between sticky top-0 z-50">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center overflow-hidden flex-shrink-0">
                             <img src="/images/candidate.png" alt="Candidate" className="w-full h-full object-cover" />
                         </div>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                            <h1 className="text-white font-bold text-lg flex items-center gap-1.5 tracking-tight">
-                                홍성훈의 신대지구 <span className="text-[11px] bg-white text-primary px-2 py-0.5 rounded-full font-black leading-none pb-px italic">MORE</span>
+                        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                            <h1 className="text-white font-bold text-[13px] leading-tight tracking-tight">
+                                기호3 홍성훈
+                                <span className="block text-[10px] font-medium opacity-90 tracking-normal">전남광주특별시의회의원선거 순천제7선거구 예비후보자</span>
                             </h1>
                             {isAdmin && (
                                 <button
@@ -88,8 +89,6 @@ export default function Layout({ children }: LayoutProps) {
                                 </button>
                             )}
                         </div>
-                    </div>
-                    <div className="flex items-center gap-3">
                     </div>
                 </header>
 

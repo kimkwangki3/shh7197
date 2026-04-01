@@ -9,6 +9,7 @@ import { Loader2, Send, Trash2, User, Calendar, ThumbsUp } from "lucide-react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { ADMIN_TOKEN_KEY } from "@/components/admin/AdminLogin";
 
 interface CommentSectionProps {
     targetType: "suggestion" | "board" | "promise" | "vote";
@@ -18,6 +19,7 @@ interface CommentSectionProps {
 export default function CommentSection({ targetType, targetId }: CommentSectionProps) {
     const { toast } = useToast();
     const [content, setContent] = useState("");
+    const isAdmin = !!localStorage.getItem(ADMIN_TOKEN_KEY);
 
     const { data: comments, isLoading } = useQuery<{ success: boolean; data: (Comment & { maskedIp?: string; isOwner?: boolean; isLiked?: boolean })[] }>({
         queryKey: [`/api/comments/${targetType}/${targetId}`],
@@ -115,29 +117,30 @@ export default function CommentSection({ targetType, targetId }: CommentSectionP
                 </h4>
             </div>
 
-            {/* Comment Form */}
-            <form onSubmit={handleSubmit} className="space-y-3">
-                <div className="relative group">
-                    <Textarea
-                        placeholder="따뜻한 댓글로 응원해주세요."
-                        className="min-h-[100px] rounded-2xl bg-slate-50 border-none p-4 text-[14px] font-medium leading-relaxed resize-none focus:bg-white focus:ring-primary/20 transition-all"
-                        value={content}
-                        onChange={(e) => setContent(e.target.value)}
-                    />
-                    <div className="absolute bottom-3 right-3">
-                        <Button
-                            type="submit"
-                            size="sm"
-                            disabled={mutation.isPending || !content.trim()}
-                            className="bg-primary text-white hover:bg-primary/90 rounded-xl px-4 py-2 font-black text-[12px] shadow-md shadow-blue-100 flex items-center gap-1.5 h-9"
-                        >
-                            {mutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                            등록
-                        </Button>
+            {/* Comment Form - Admin Only */}
+            {isAdmin && (
+                <form onSubmit={handleSubmit} className="space-y-3">
+                    <div className="relative group">
+                        <Textarea
+                            placeholder="관리자 댓글을 작성하세요."
+                            className="min-h-[100px] rounded-2xl bg-slate-50 border-none p-4 text-[14px] font-medium leading-relaxed resize-none focus:bg-white focus:ring-primary/20 transition-all"
+                            value={content}
+                            onChange={(e) => setContent(e.target.value)}
+                        />
+                        <div className="absolute bottom-3 right-3">
+                            <Button
+                                type="submit"
+                                size="sm"
+                                disabled={mutation.isPending || !content.trim()}
+                                className="bg-primary text-white hover:bg-primary/90 rounded-xl px-4 py-2 font-black text-[12px] shadow-md shadow-blue-100 flex items-center gap-1.5 h-9"
+                            >
+                                {mutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                                등록
+                            </Button>
+                        </div>
                     </div>
-                </div>
-                <p className="text-[10px] text-slate-400 px-1">* IP 주소를 기반으로 익명 등록됩니다.</p>
-            </form>
+                </form>
+            )}
 
             {/* Comments List */}
             <div className="space-y-4">

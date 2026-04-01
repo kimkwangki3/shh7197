@@ -782,7 +782,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/comments", async (req: Request, res: Response) => {
+  app.post("/api/comments", isAdmin, async (req: Request, res: Response) => {
     try {
       const data = insertCommentSchema.parse(req.body);
       const clientIp = getClientIp(req);
